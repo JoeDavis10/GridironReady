@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowRight,
   BookOpen,
-  Gamepad2,
+  LayoutGrid,
   Shield,
   Shapes,
   Users,
@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { drills } from "@/data/drills";
+import { plays } from "@/data/plays";
 import {
   AGE_BAND_LABELS,
   CONTACT_LABELS,
@@ -61,6 +62,8 @@ function HomePage() {
     ].includes(d.id),
   );
 
+  const featuredPlays = plays.slice(0, 3);
+
   return (
     <AppShell>
       <section className="relative overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
@@ -87,8 +90,8 @@ function HomePage() {
             </h1>
           </div>
           <p className="max-w-sm text-sm leading-relaxed text-[var(--color-muted)]">
-            Programs, fundamentals, position rooms, contact progressions, and
-            competitive games — built for youth through adult tackle football.
+            Programs, play diagrams with role animations, roster cloud sync, and
+            competitive games — youth through adult tackle football.
           </p>
           <div className="flex flex-wrap gap-2">
             {today && (
@@ -99,187 +102,192 @@ function HomePage() {
                 </Link>
               </Button>
             )}
-            <Button asChild variant="secondary" size="lg">
-              <Link to="/plans">Programs</Link>
+            <Button asChild size="lg" variant="secondary">
+              <Link to="/plays">
+                <LayoutGrid aria-hidden /> Playbook
+              </Link>
             </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Level picker */}
-      <section className="mt-5">
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--color-subtle)]">
-          Your level
-        </p>
-        <div className="flex gap-2 overflow-x-auto pb-1 touch-pan-x [scrollbar-width:none]">
-          {(Object.keys(AGE_BAND_LABELS) as AgeBand[]).map((a) => (
-            <button
-              key={a}
-              type="button"
-              onClick={() => {
-                setAgeBand(a);
-                const next = programTracks.find((t) => t.ageBands.includes(a));
-                if (next) setSelectedTrackId(next.id);
-              }}
-              className={cn(
-                "h-9 shrink-0 rounded-full border px-3 text-xs font-medium whitespace-nowrap",
-                ageBand === a
-                  ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
-                  : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]",
-              )}
-            >
-              {AGE_BAND_LABELS[a]}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--color-subtle)]">
-          Contact ceiling
-        </p>
-        <div className="mt-2 flex gap-2 overflow-x-auto pb-1 touch-pan-x [scrollbar-width:none]">
-          {(Object.keys(CONTACT_LABELS) as ContactLevel[]).map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setContactCap(c)}
-              className={cn(
-                "h-9 shrink-0 rounded-full border px-3 text-xs font-medium whitespace-nowrap",
-                contactCap === c
-                  ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
-                  : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]",
-              )}
-            >
-              {CONTACT_LABELS[c]}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-6 overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)]">
-        <div className="grid grid-cols-[1fr_7.5rem] gap-0">
-          <div className="p-4">
-            <div className="mb-2 flex items-center gap-2 text-[var(--color-primary)]">
-              <Shapes className="size-4" aria-hidden />
-              <p className="text-[11px] font-medium uppercase tracking-[0.12em]">
-                Animated COD
-              </p>
-            </div>
-            <h2 className="font-display text-xl font-semibold leading-tight tracking-tight">
-              Cone Agilities
-            </h2>
-            <p className="mt-1 text-xs leading-relaxed text-[var(--color-muted)]">
-              12 patterns with step-by-step motion and coaching cues.
-            </p>
-            <Button asChild size="sm" className="mt-3">
-              <Link to="/cones">
-                Open sheet <ArrowRight aria-hidden />
+            <Button asChild size="lg" variant="outline">
+              <Link to="/roster">
+                <Users aria-hidden /> Roster
               </Link>
             </Button>
           </div>
-          <div className="border-l border-[var(--color-border)] bg-[var(--color-elevated)] p-1.5">
-            <ConeDiagram
-              diagramId="advanced-inside-box"
-              compact
-              showLegend={false}
-            />
-          </div>
         </div>
       </section>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <Link
-          to="/roster"
-          className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5"
-        >
-          <Users className="mb-2 size-4 text-[var(--color-primary)]" aria-hidden />
-          <p className="text-sm font-semibold">Roster & eval</p>
-          <p className="mt-0.5 text-xs text-[var(--color-muted)]">Position fit</p>
-        </Link>
-        <Link
-          to="/safety"
-          className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5"
-        >
-          <Shield className="mb-2 size-4 text-[var(--color-primary)]" aria-hidden />
-          <p className="text-sm font-semibold">Safety</p>
-          <p className="mt-0.5 text-xs text-[var(--color-muted)]">Standards</p>
-        </Link>
-        <Link
-          to="/drills"
-          className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5"
-        >
-          <BookOpen className="mb-2 size-4 text-[var(--color-primary)]" aria-hidden />
-          <p className="text-sm font-semibold">Drill library</p>
-          <p className="mt-0.5 text-xs text-[var(--color-muted)]">{drills.length}+ drills</p>
-        </Link>
-        <Link
-          to="/games"
-          className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5"
-        >
-          <Gamepad2 className="mb-2 size-4 text-[var(--color-primary)]" aria-hidden />
-          <p className="text-sm font-semibold">Games</p>
-          <p className="mt-0.5 text-xs text-[var(--color-muted)]">Compete</p>
-        </Link>
-      </div>
-
-      <Link
-        to="/progress"
-        className="mt-4 block rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
-      >
-        <div className="mb-3 flex items-end justify-between gap-3">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--color-subtle)]">
-              {track.shortName} progress
-            </p>
-            <p className="font-display text-2xl font-semibold tabular">
-              {trackDone}
-              <span className="text-[var(--color-subtle)]">/{trackPlans.length}</span>{" "}
-              <span className="text-base font-medium text-[var(--color-muted)]">
-                days
-              </span>
-            </p>
-          </div>
-          <span className="text-sm tabular text-[var(--color-primary)]">
-            {progressPct}%
-          </span>
-        </div>
-        <Progress value={progressPct} />
-      </Link>
-
-      {today && (
-        <section className="mt-8">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-xl font-semibold tracking-tight">
-              Today's practice
-            </h2>
-            <Link
-              to="/plans"
-              className="text-sm font-medium text-[var(--color-primary)]"
-            >
-              All programs
-            </Link>
-          </div>
-          <PlanCard
-            plan={today}
-            featured
-            completed={completedPlans.includes(today.id)}
-          />
-        </section>
-      )}
-
-      <section className="mt-8 pb-2">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-display text-xl font-semibold tracking-tight">
-            Featured drills
+      <section className="mt-5 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-display text-lg font-semibold tracking-tight">
+            Today's program
           </h2>
-          <Link to="/drills" className="text-sm font-medium text-[var(--color-primary)]">
-            Library
+          <Link
+            to="/plans"
+            className="text-xs font-medium text-[var(--color-primary)]"
+          >
+            All programs
           </Link>
         </div>
-        <div className="space-y-3">
-          {featuredDrills.map((drill) => (
-            <DrillCard key={drill.id} drill={drill} compact />
+        <div className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--color-subtle)]">
+                {track.name}
+              </p>
+              <p className="font-display text-xl font-semibold tracking-tight">
+                {today?.title ?? "Select a track"}
+              </p>
+            </div>
+            <Badge variant="secondary">{progressPct}%</Badge>
+          </div>
+          <Progress value={progressPct} className="mt-3" />
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(Object.keys(AGE_BAND_LABELS) as AgeBand[]).map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setAgeBand(id)}
+                className={cn(
+                  "h-8 rounded-full border px-2.5 text-[11px] font-medium",
+                  ageBand === id
+                    ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
+                    : "border-[var(--color-border)] text-[var(--color-muted)]",
+                )}
+              >
+                {AGE_BAND_LABELS[id]}
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(Object.keys(CONTACT_LABELS) as ContactLevel[]).map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setContactCap(id)}
+                className={cn(
+                  "h-8 rounded-full border px-2.5 text-[11px] font-medium",
+                  contactCap === id
+                    ? "border-transparent bg-[var(--color-primary-dim)] text-[var(--color-primary)]"
+                    : "border-[var(--color-border)] text-[var(--color-muted)]",
+                )}
+              >
+                {CONTACT_LABELS[id]}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+            {programTracks.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setSelectedTrackId(t.id)}
+                className={cn(
+                  "h-9 shrink-0 rounded-full border px-3 text-xs font-medium",
+                  selectedTrackId === t.id
+                    ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
+                    : "border-[var(--color-border)] text-[var(--color-muted)]",
+                )}
+              >
+                {t.shortName ?? t.name}
+              </button>
+            ))}
+          </div>
+          {today && (
+            <div className="mt-4">
+              <PlanCard plan={today} featured />
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="mt-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-lg font-semibold tracking-tight">
+            Play diagrams
+          </h2>
+          <Link to="/plays" className="text-xs font-medium text-[var(--color-primary)]">
+            Full playbook
+          </Link>
+        </div>
+        <div className="space-y-2">
+          {featuredPlays.map((play) => (
+            <Link
+              key={play.id}
+              to="/plays/$playId"
+              params={{ playId: play.id }}
+              className="flex items-center justify-between gap-3 rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap gap-1.5">
+                  <Badge variant="outline">{play.shortName}</Badge>
+                  <Badge variant="secondary">{play.side}</Badge>
+                </div>
+                <p className="mt-1 font-display text-base font-semibold tracking-tight">
+                  {play.name}
+                </p>
+                <p className="truncate text-xs text-[var(--color-subtle)]">
+                  {play.roles.length} roles · {play.formation}
+                </p>
+              </div>
+              <ArrowRight className="size-4 shrink-0 text-[var(--color-subtle)]" />
+            </Link>
           ))}
         </div>
       </section>
+
+      <section className="mt-6 grid grid-cols-2 gap-2">
+        <QuickLink to="/roster" icon={Users} label="Roster" sub="Cloud sync" />
+        <QuickLink to="/drills" icon={BookOpen} label="Drills" sub="Library" />
+        <QuickLink to="/cones" icon={Shapes} label="Cone sheet" sub="Patterns" />
+        <QuickLink to="/safety" icon={Shield} label="Safety" sub="Contact rules" />
+      </section>
+
+      <section className="mt-6 space-y-3 pb-2">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-lg font-semibold tracking-tight">
+            Featured drills
+          </h2>
+          <Link to="/drills" className="text-xs font-medium text-[var(--color-primary)]">
+            All drills
+          </Link>
+        </div>
+        <div className="space-y-2">
+          {featuredDrills.map((d) => (
+            <DrillCard key={d.id} drill={d} />
+          ))}
+        </div>
+        {featuredDrills[1]?.diagramId && (
+          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--color-subtle)]">
+              Sample cone pattern
+            </p>
+            <ConeDiagram diagramId={featuredDrills[1].diagramId} compact />
+          </div>
+        )}
+      </section>
     </AppShell>
+  );
+}
+
+function QuickLink({
+  to,
+  icon: Icon,
+  label,
+  sub,
+}: {
+  to: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  sub: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5"
+    >
+      <Icon className="mb-2 size-5 text-[var(--color-primary)]" />
+      <p className="font-display text-base font-semibold tracking-tight">{label}</p>
+      <p className="text-[11px] text-[var(--color-subtle)]">{sub}</p>
+    </Link>
   );
 }

@@ -2,7 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   BookOpen,
   CalendarDays,
-  Gamepad2,
+  LayoutGrid,
   Home,
   Users,
   type LucideIcon,
@@ -12,9 +12,9 @@ import { cn } from "@/lib/utils";
 const nav: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/", label: "Home", icon: Home },
   { to: "/plans", label: "Programs", icon: CalendarDays },
-  { to: "/drills", label: "Drills", icon: BookOpen },
+  { to: "/plays", label: "Plays", icon: LayoutGrid },
   { to: "/roster", label: "Roster", icon: Users },
-  { to: "/games", label: "Games", icon: Gamepad2 },
+  { to: "/drills", label: "Drills", icon: BookOpen },
 ];
 
 export function AppShell({

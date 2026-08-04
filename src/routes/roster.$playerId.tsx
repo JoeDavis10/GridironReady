@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
   ClipboardList,
+  IdCard,
   Ruler,
   Target,
   Trash2,
@@ -24,6 +25,7 @@ import { analyzePlayer } from "@/lib/roster-analysis";
 import {
   playerDisplayName,
   useRosterStore,
+  type Player,
 } from "@/store/roster";
 import { cn } from "@/lib/utils";
 
@@ -31,10 +33,19 @@ export const Route = createFileRoute("/roster/$playerId")({
   component: PlayerDetailPage,
 });
 
+const ALL_POSITIONS = Object.keys(POSITION_LABELS) as PositionId[];
+
+type TabId = "identity" | "fit" | "traits" | "measurables" | "evals";
+
 function PlayerDetailPage() {
   const { playerId } = Route.useParams();
-  const navigate = useNavigate();
   const player = useRosterStore((s) => s.players.find((p) => p.id === playerId));
+  if (!player) throw notFound();
+  return <PlayerDetail player={player} />;
+}
+
+function PlayerDetail({ player }: { player: Player }) {
+  const navigate = useNavigate();
   const evalLogs = useRosterStore((s) => s.evalLogs);
   const setTrait = useRosterStore((s) => s.setTrait);
   const setMeasurable = useRosterStore((s) => s.setMeasurable);
@@ -44,15 +55,17 @@ function PlayerDetailPage() {
   const compareIds = useRosterStore((s) => s.compareIds);
   const logEval = useRosterStore((s) => s.logEval);
   const removeEval = useRosterStore((s) => s.removeEval);
+  const cloudUserId = useRosterStore((s) => s.cloudUserId);
 
-  const [tab, setTab] = useState<"fit" | "traits" | "measurables" | "evals">(
-    "fit",
-  );
+  const [tab, setTab] = useState<TabId>("identity");
   const [evalDrill, setEvalDrill] = useState(EVAL_DRILLS[0]!.drillId);
   const [evalScore, setEvalScore] = useState(7);
   const [evalNote, setEvalNote] = useState("");
+  const [notesDraft, setNotesDraft] = useState(player.notes);
 
-  if (!player) throw notFound();
+  useEffect(() => {
+    setNotesDraft(player.notes);
+  }, [player.id, player.notes]);
 
   const analysis = useMemo(
     () => analyzePlayer(player, evalLogs),
@@ -63,6 +76,19 @@ function PlayerDetailPage() {
     .sort((a, b) => b.at.localeCompare(a.at));
   const inCompare = compareIds.includes(player.id);
   const bestProfile = getProfile(analysis.best.positionId);
+
+  function toggleTarget(id: PositionId) {
+    const next = player.targetPositions.includes(id)
+      ? player.targetPositions.filter((x) => x !== id)
+      : [...player.targetPositions, id];
+    updatePlayer(player.id, { targetPositions: next });
+  }
+
+  function flushNotes() {
+    if (notesDraft !== player.notes) {
+      updatePlayer(player.id, { notes: notesDraft });
+    }
+  }
 
   return (
     <AppShell hideNav>
@@ -89,6 +115,7 @@ function PlayerDetailPage() {
         {player.listedPosition && (
           <Badge>Listed {POSITION_LABELS[player.listedPosition]}</Badge>
         )}
+        {cloudUserId && <Badge variant="secondary">Cloud saved</Badge>}
       </div>
       <h1 className="mt-2 font-display text-[2rem] font-semibold leading-none tracking-tight">
         {playerDisplayName(player)}
@@ -98,18 +125,19 @@ function PlayerDetailPage() {
         <span className="font-semibold text-[var(--color-primary)]">
           {POSITION_LABELS[analysis.best.positionId]} ({analysis.best.score})
         </span>
-        {player.listedPosition &&
-          player.listedPosition !== analysis.best.positionId && (
-            <span>
-              {" "}
-              · differs from listed {POSITION_LABELS[player.listedPosition]}
-            </span>
-          )}
+        {player.targetPositions.length > 0 && (
+          <span>
+            {" "}
+            · Assignments:{" "}
+            {player.targetPositions.map((id) => POSITION_LABELS[id]).join(", ")}
+          </span>
+        )}
       </p>
 
       <div className="mt-5 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:none]">
         {(
           [
+            ["identity", "Identity"],
             ["fit", "Position fit"],
             ["traits", "Traits"],
             ["measurables", "Measurables"],
@@ -131,6 +159,131 @@ function PlayerDetailPage() {
           </button>
         ))}
       </div>
+
+      {tab === "identity" && (
+        <section className="mt-5 space-y-4 rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <div className="mb-1 flex items-center gap-2 text-[var(--color-primary)]">
+            <IdCard className="size-4" aria-hidden />
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em]">
+              Name · number · assignments
+            </p>
+          </div>
+          <p className="text-sm text-[var(--color-muted)]">
+            Changes save to this device
+            {cloudUserId ? " and Supabase for your coach account" : ""}.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block space-y-1.5">
+              <span className="text-xs text-[var(--color-muted)]">First name</span>
+              <input
+                value={player.firstName}
+                onChange={(e) =>
+                  updatePlayer(player.id, { firstName: e.target.value })
+                }
+                className={fieldClass}
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-xs text-[var(--color-muted)]">Last name</span>
+              <input
+                value={player.lastName}
+                onChange={(e) =>
+                  updatePlayer(player.id, { lastName: e.target.value })
+                }
+                className={fieldClass}
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-xs text-[var(--color-muted)]">Jersey #</span>
+              <input
+                value={player.number ?? ""}
+                onChange={(e) =>
+                  updatePlayer(player.id, {
+                    number: e.target.value.trim() || undefined,
+                  })
+                }
+                inputMode="numeric"
+                className={fieldClass}
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-xs text-[var(--color-muted)]">Grade / year</span>
+              <input
+                value={player.gradeOrYear ?? ""}
+                onChange={(e) =>
+                  updatePlayer(player.id, {
+                    gradeOrYear: e.target.value.trim() || undefined,
+                  })
+                }
+                className={fieldClass}
+              />
+            </label>
+          </div>
+          <label className="block space-y-1.5">
+            <span className="text-xs text-[var(--color-muted)]">Listed position</span>
+            <select
+              value={player.listedPosition ?? ""}
+              onChange={(e) =>
+                updatePlayer(player.id, {
+                  listedPosition: (e.target.value || undefined) as
+                    | PositionId
+                    | undefined,
+                })
+              }
+              className={fieldClass}
+            >
+              <option value="">Unlisted</option>
+              {ALL_POSITIONS.map((id) => (
+                <option key={id} value={id}>
+                  {POSITION_LABELS[id]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div>
+            <p className="mb-2 text-xs text-[var(--color-muted)]">
+              Position assignments (depth chart / cross-train)
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {ALL_POSITIONS.map((id) => {
+                const on = player.targetPositions.includes(id);
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => toggleTarget(id)}
+                    className={cn(
+                      "h-9 rounded-full border px-3 text-xs font-medium",
+                      on
+                        ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
+                        : "border-[var(--color-border)] bg-[var(--color-elevated)] text-[var(--color-muted)]",
+                    )}
+                  >
+                    {POSITION_LABELS[id]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <label className="block space-y-1.5">
+            <span className="text-xs text-[var(--color-muted)]">Coach notes</span>
+            <textarea
+              value={notesDraft}
+              onChange={(e) => setNotesDraft(e.target.value)}
+              onBlur={flushNotes}
+              rows={4}
+              className={cn(fieldClass, "h-auto min-h-[6rem] py-2.5")}
+              placeholder="Scheme fit, practice habits, medical notes…"
+            />
+            <span className="text-[11px] text-[var(--color-subtle)]">
+              Saves when you leave the field
+            </span>
+          </label>
+          <Button asChild variant="outline" size="sm" className="w-full">
+            <Link to="/plays">Open playbook animations</Link>
+          </Button>
+        </section>
+      )}
 
       {tab === "fit" && (
         <section className="mt-5 space-y-5">
@@ -157,43 +310,6 @@ function PlayerDetailPage() {
                 ? ` · drill eval ${analysis.best.drillBonus > 0 ? "+" : ""}${analysis.best.drillBonus}`
                 : ""}
             </p>
-          </div>
-
-          <div className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--color-subtle)]">
-              Listed position
-            </p>
-            <select
-              value={player.listedPosition ?? ""}
-              onChange={(e) =>
-                updatePlayer(player.id, {
-                  listedPosition: (e.target.value || undefined) as
-                    | PositionId
-                    | undefined,
-                })
-              }
-              className="mt-2 h-11 w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-elevated)] px-3 text-sm"
-            >
-              <option value="">Unlisted</option>
-              {(Object.keys(POSITION_LABELS) as PositionId[]).map((id) => (
-                <option key={id} value={id}>
-                  {POSITION_LABELS[id]}
-                </option>
-              ))}
-            </select>
-            <label className="mt-4 block">
-              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--color-subtle)]">
-                Coach notes
-              </span>
-              <textarea
-                value={player.notes}
-                onChange={(e) =>
-                  updatePlayer(player.id, { notes: e.target.value })
-                }
-                rows={3}
-                className="mt-2 w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-elevated)] px-3 py-2 text-sm"
-              />
-            </label>
           </div>
 
           <div>
@@ -356,8 +472,8 @@ function PlayerDetailPage() {
 
           <div className="space-y-2">
             {playerLogs.length === 0 ? (
-              <p className="text-center text-sm text-[var(--color-muted)] py-6">
-                No drill grades yet. Log from here or from any eval-linked drill.
+              <p className="py-6 text-center text-sm text-[var(--color-muted)]">
+                No drill grades yet.
               </p>
             ) : (
               playerLogs.map((log) => {
@@ -413,6 +529,9 @@ function PlayerDetailPage() {
     </AppShell>
   );
 }
+
+const fieldClass =
+  "h-11 w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-elevated)] px-3 text-sm text-[var(--color-fg)] outline-none focus:border-[var(--color-primary)]";
 
 function NumField({
   label,

@@ -15,6 +15,7 @@ import { Route as DrillsRouteImport } from './routes/drills'
 import { Route as GamesRouteImport } from './routes/games'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PlansRouteImport } from './routes/plans'
+import { Route as PlaysRouteImport } from './routes/plays'
 import { Route as PositionsRouteImport } from './routes/positions'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as RosterRouteImport } from './routes/roster'
@@ -25,6 +26,7 @@ import { Route as DrillsDrillIdRouteImport } from './routes/drills.$drillId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as PlansIndexRouteImport } from './routes/plans.index'
 import { Route as PlansPlanIdRouteImport } from './routes/plans.$planId'
+import { Route as PlaysPlayIdRouteImport } from './routes/plays.$playId'
 import { Route as PositionsPositionIdRouteImport } from './routes/positions.$positionId'
 import { Route as RosterPlayerIdRouteImport } from './routes/roster.$playerId'
 import { Route as RosterCompareRouteImport } from './routes/roster.compare'
@@ -59,6 +61,11 @@ const LoginRoute = LoginRouteImport.update({
 const PlansRoute = PlansRouteImport.update({
   id: '/plans',
   path: '/plans',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlaysRoute = PlaysRouteImport.update({
+  id: '/plays',
+  path: '/plays',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PositionsRoute = PositionsRouteImport.update({
@@ -111,6 +118,11 @@ const PlansPlanIdRoute = PlansPlanIdRouteImport.update({
   path: '/$planId',
   getParentRoute: () => PlansRoute,
 } as any)
+const PlaysPlayIdRoute = PlaysPlayIdRouteImport.update({
+  id: '/$playId',
+  path: '/$playId',
+  getParentRoute: () => PlaysRoute,
+} as any)
 const PositionsPositionIdRoute = PositionsPositionIdRouteImport.update({
   id: '/$positionId',
   path: '/$positionId',
@@ -144,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/games': typeof GamesRouteWithChildren
   '/login': typeof LoginRoute
   '/plans': typeof PlansRouteWithChildren
+  '/plays': typeof PlaysRouteWithChildren
   '/positions': typeof PositionsRouteWithChildren
   '/progress': typeof ProgressRoute
   '/roster': typeof RosterRouteWithChildren
@@ -152,6 +165,7 @@ export interface FileRoutesByFullPath {
   '/drills/$drillId': typeof DrillsDrillIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/plans/$planId': typeof PlansPlanIdRoute
+  '/plays/$playId': typeof PlaysPlayIdRoute
   '/positions/$positionId': typeof PositionsPositionIdRoute
   '/roster/$playerId': typeof RosterPlayerIdRoute
   '/roster/compare': typeof RosterCompareRoute
@@ -165,6 +179,7 @@ export interface FileRoutesByTo {
   '/cones': typeof ConesRoute
   '/games': typeof GamesRouteWithChildren
   '/login': typeof LoginRoute
+  '/plays': typeof PlaysRouteWithChildren
   '/positions': typeof PositionsRouteWithChildren
   '/progress': typeof ProgressRoute
   '/roster': typeof RosterRouteWithChildren
@@ -173,6 +188,7 @@ export interface FileRoutesByTo {
   '/drills/$drillId': typeof DrillsDrillIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/plans/$planId': typeof PlansPlanIdRoute
+  '/plays/$playId': typeof PlaysPlayIdRoute
   '/positions/$positionId': typeof PositionsPositionIdRoute
   '/roster/$playerId': typeof RosterPlayerIdRoute
   '/roster/compare': typeof RosterCompareRoute
@@ -189,6 +205,7 @@ export interface FileRoutesById {
   '/games': typeof GamesRouteWithChildren
   '/login': typeof LoginRoute
   '/plans': typeof PlansRouteWithChildren
+  '/plays': typeof PlaysRouteWithChildren
   '/positions': typeof PositionsRouteWithChildren
   '/progress': typeof ProgressRoute
   '/roster': typeof RosterRouteWithChildren
@@ -197,6 +214,7 @@ export interface FileRoutesById {
   '/drills/$drillId': typeof DrillsDrillIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/plans/$planId': typeof PlansPlanIdRoute
+  '/plays/$playId': typeof PlaysPlayIdRoute
   '/positions/$positionId': typeof PositionsPositionIdRoute
   '/roster/$playerId': typeof RosterPlayerIdRoute
   '/roster/compare': typeof RosterCompareRoute
@@ -214,6 +232,7 @@ export interface FileRouteTypes {
     | '/games'
     | '/login'
     | '/plans'
+    | '/plays'
     | '/positions'
     | '/progress'
     | '/roster'
@@ -222,6 +241,7 @@ export interface FileRouteTypes {
     | '/drills/$drillId'
     | '/games/$gameId'
     | '/plans/$planId'
+    | '/plays/$playId'
     | '/positions/$positionId'
     | '/roster/$playerId'
     | '/roster/compare'
@@ -235,6 +255,7 @@ export interface FileRouteTypes {
     | '/cones'
     | '/games'
     | '/login'
+    | '/plays'
     | '/positions'
     | '/progress'
     | '/roster'
@@ -243,6 +264,7 @@ export interface FileRouteTypes {
     | '/drills/$drillId'
     | '/games/$gameId'
     | '/plans/$planId'
+    | '/plays/$playId'
     | '/positions/$positionId'
     | '/roster/$playerId'
     | '/roster/compare'
@@ -258,6 +280,7 @@ export interface FileRouteTypes {
     | '/games'
     | '/login'
     | '/plans'
+    | '/plays'
     | '/positions'
     | '/progress'
     | '/roster'
@@ -266,6 +289,7 @@ export interface FileRouteTypes {
     | '/drills/$drillId'
     | '/games/$gameId'
     | '/plans/$planId'
+    | '/plays/$playId'
     | '/positions/$positionId'
     | '/roster/$playerId'
     | '/roster/compare'
@@ -282,6 +306,7 @@ export interface RootRouteChildren {
   GamesRoute: typeof GamesRouteWithChildren
   LoginRoute: typeof LoginRoute
   PlansRoute: typeof PlansRouteWithChildren
+  PlaysRoute: typeof PlaysRouteWithChildren
   PositionsRoute: typeof PositionsRouteWithChildren
   ProgressRoute: typeof ProgressRoute
   RosterRoute: typeof RosterRouteWithChildren
@@ -332,6 +357,13 @@ declare module '@tanstack/react-router' {
       path: '/plans'
       fullPath: '/plans'
       preLoaderRoute: typeof PlansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plays': {
+      id: '/plays'
+      path: '/plays'
+      fullPath: '/plays'
+      preLoaderRoute: typeof PlaysRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/positions': {
@@ -403,6 +435,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/plans/$planId'
       preLoaderRoute: typeof PlansPlanIdRouteImport
       parentRoute: typeof PlansRoute
+    }
+    '/plays/$playId': {
+      id: '/plays/$playId'
+      path: '/$playId'
+      fullPath: '/plays/$playId'
+      preLoaderRoute: typeof PlaysPlayIdRouteImport
+      parentRoute: typeof PlaysRoute
     }
     '/positions/$positionId': {
       id: '/positions/$positionId'
@@ -477,6 +516,16 @@ const PlansRouteChildren: PlansRouteChildren = {
 
 const PlansRouteWithChildren = PlansRoute._addFileChildren(PlansRouteChildren)
 
+interface PlaysRouteChildren {
+  PlaysPlayIdRoute: typeof PlaysPlayIdRoute
+}
+
+const PlaysRouteChildren: PlaysRouteChildren = {
+  PlaysPlayIdRoute: PlaysPlayIdRoute,
+}
+
+const PlaysRouteWithChildren = PlaysRoute._addFileChildren(PlaysRouteChildren)
+
 interface PositionsRouteChildren {
   PositionsPositionIdRoute: typeof PositionsPositionIdRoute
 }
@@ -511,6 +560,7 @@ const rootRouteChildren: RootRouteChildren = {
   GamesRoute: GamesRouteWithChildren,
   LoginRoute: LoginRoute,
   PlansRoute: PlansRouteWithChildren,
+  PlaysRoute: PlaysRouteWithChildren,
   PositionsRoute: PositionsRouteWithChildren,
   ProgressRoute: ProgressRoute,
   RosterRoute: RosterRouteWithChildren,

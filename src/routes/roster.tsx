@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import {
   ArrowRightLeft,
+  LayoutGrid,
   Plus,
   Search,
   Sparkles,
@@ -58,14 +59,20 @@ function RosterPage() {
       .filter((p) => {
         if (posFilter !== "all") {
           const best = analyzePlayer(p, evalLogs).best.positionId;
-          if (p.listedPosition !== posFilter && best !== posFilter) return false;
+          if (
+            p.listedPosition !== posFilter &&
+            best !== posFilter &&
+            !p.targetPositions.includes(posFilter)
+          )
+            return false;
         }
         if (!q) return true;
         const name = playerDisplayName(p).toLowerCase();
         return (
           name.includes(q) ||
           (p.number ?? "").includes(q) ||
-          (p.gradeOrYear ?? "").toLowerCase().includes(q)
+          (p.gradeOrYear ?? "").toLowerCase().includes(q) ||
+          (p.notes ?? "").toLowerCase().includes(q)
         );
       })
       .sort((a, b) => playerSortKey(a).localeCompare(playerSortKey(b)));
@@ -90,11 +97,11 @@ function RosterPage() {
           </span>
           <div className="min-w-0">
             <h2 className="font-display text-lg font-semibold tracking-tight">
-              Build the depth chart with data
+              Depth chart with data
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-[var(--color-muted)]">
-              Rate traits, log drill evals, compare athletes, and see best-fit
-              positions — not just listed ones.
+              Name, number, position assignments, and notes — synced to Supabase
+              when signed in. Pair with play diagrams for installs.
             </p>
           </div>
         </div>
@@ -103,6 +110,11 @@ function RosterPage() {
             <Link to="/roster/compare">
               <ArrowRightLeft aria-hidden /> Compare
               {compareIds.length > 0 ? ` (${compareIds.length})` : ""}
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/plays">
+              <LayoutGrid aria-hidden /> Playbook
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm">
@@ -169,7 +181,7 @@ function RosterPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search name, number…"
+              placeholder="Search name, number, notes…"
               className="h-11 w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] pl-10 pr-3 text-sm text-[var(--color-fg)] outline-none focus:border-[var(--color-primary)]"
             />
           </div>
@@ -212,30 +224,46 @@ function RosterPage() {
                       params={{ playerId: p.id }}
                       className="min-w-0 flex-1 rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5 transition-[border-color] hover:border-[var(--color-border-strong)]"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
+                      <div className="flex items-start gap-3">
+                        <span className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-elevated)] font-display text-lg font-semibold tabular text-[var(--color-primary)]">
+                          {p.number ? `#${p.number}` : "—"}
+                        </span>
+                        <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            {p.number && (
-                              <Badge variant="outline">#{p.number}</Badge>
-                            )}
                             {p.gradeOrYear && (
                               <Badge variant="secondary">{p.gradeOrYear}</Badge>
+                            )}
+                            {p.listedPosition && (
+                              <Badge variant="outline">
+                                {POSITION_LABELS[p.listedPosition]}
+                              </Badge>
                             )}
                           </div>
                           <p className="mt-1 font-display text-lg font-semibold tracking-tight truncate">
                             {playerDisplayName(p)}
                           </p>
                           <p className="mt-0.5 text-xs text-[var(--color-muted)]">
-                            Listed:{" "}
-                            {p.listedPosition
-                              ? POSITION_LABELS[p.listedPosition]
-                              : "—"}
+                            {p.targetPositions.length > 0 ? (
+                              <>
+                                Assign:{" "}
+                                {p.targetPositions
+                                  .map((id) => POSITION_LABELS[id].split(" ")[0])
+                                  .join(" · ")}
+                              </>
+                            ) : (
+                              <>Listed / fit only</>
+                            )}
                             {" · "}
                             <span className="text-[var(--color-primary)]">
-                              Best fit: {POSITION_LABELS[best.positionId]} (
+                              Fit {POSITION_LABELS[best.positionId].split(" ")[0]} (
                               {best.score})
                             </span>
                           </p>
+                          {p.notes?.trim() && (
+                            <p className="mt-1 line-clamp-1 text-[11px] text-[var(--color-subtle)]">
+                              {p.notes}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </Link>

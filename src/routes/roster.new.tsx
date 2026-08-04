@@ -5,10 +5,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { POSITION_LABELS, type PositionId } from "@/data/positions";
 import { useRosterStore } from "@/store/roster";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/roster/new")({
   component: NewPlayerPage,
 });
+
+const ALL_POSITIONS = Object.keys(POSITION_LABELS) as PositionId[];
 
 function NewPlayerPage() {
   const navigate = useNavigate();
@@ -18,8 +21,16 @@ function NewPlayerPage() {
   const [number, setNumber] = useState("");
   const [gradeOrYear, setGradeOrYear] = useState("");
   const [listedPosition, setListedPosition] = useState<PositionId | "">("");
+  const [targetPositions, setTargetPositions] = useState<PositionId[]>([]);
+  const [notes, setNotes] = useState("");
 
   const canSave = firstName.trim() && lastName.trim();
+
+  function toggleTarget(id: PositionId) {
+    setTargetPositions((cur) =>
+      cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
+    );
+  }
 
   return (
     <AppShell hideNav>
@@ -32,7 +43,7 @@ function NewPlayerPage() {
         Add player
       </h1>
       <p className="mt-2 text-sm text-[var(--color-muted)]">
-        Start with identity — traits and measurables on the next screen.
+        Name, number, and position assignments sync to the cloud when signed in.
       </p>
 
       <form
@@ -43,9 +54,11 @@ function NewPlayerPage() {
           const id = addPlayer({
             firstName,
             lastName,
-            number: number || undefined,
-            gradeOrYear: gradeOrYear || undefined,
+            number: number.trim() || undefined,
+            gradeOrYear: gradeOrYear.trim() || undefined,
             listedPosition: listedPosition || undefined,
+            targetPositions,
+            notes: notes.trim(),
           });
           void navigate({ to: "/roster/$playerId", params: { playerId: id } });
         }}
@@ -53,6 +66,7 @@ function NewPlayerPage() {
         <Field label="First name">
           <input
             required
+            autoComplete="given-name"
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
             className={inputClass}
@@ -61,18 +75,20 @@ function NewPlayerPage() {
         <Field label="Last name">
           <input
             required
+            autoComplete="family-name"
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
             className={inputClass}
           />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Number">
+          <Field label="Jersey number">
             <input
               value={number}
               onChange={(e) => setNumber(e.target.value)}
               className={inputClass}
               inputMode="numeric"
+              placeholder="#"
             />
           </Field>
           <Field label="Grade / year">
@@ -93,13 +109,51 @@ function NewPlayerPage() {
             className={inputClass}
           >
             <option value="">Unlisted</option>
-            {(Object.keys(POSITION_LABELS) as PositionId[]).map((id) => (
+            {ALL_POSITIONS.map((id) => (
               <option key={id} value={id}>
                 {POSITION_LABELS[id]}
               </option>
             ))}
           </select>
         </Field>
+
+        <div>
+          <p className="mb-2 text-xs font-medium text-[var(--color-muted)]">
+            Position assignments{" "}
+            <span className="text-[var(--color-subtle)]">(depth / cross-train)</span>
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {ALL_POSITIONS.map((id) => {
+              const on = targetPositions.includes(id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => toggleTarget(id)}
+                  className={cn(
+                    "h-9 rounded-full border px-3 text-xs font-medium",
+                    on
+                      ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
+                      : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]",
+                  )}
+                >
+                  {POSITION_LABELS[id]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <Field label="Coach notes">
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            placeholder="Injury history, scheme fit, practice habits…"
+            className={cn(inputClass, "h-auto min-h-[5.5rem] py-2.5")}
+          />
+        </Field>
+
         <Button type="submit" size="lg" className="w-full" disabled={!canSave}>
           Create & rate traits
         </Button>
