@@ -1,0 +1,1554 @@
+import { r as toConeDrills } from "./cone-drills-f7Xbkf6-.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/drills-DBQZjy_r.js
+/**
+* Pro-grade fundamentals + contact-progression + position installs.
+* Merged into the main drill library via drills.ts.
+*/
+var fundamentalDrills = [
+	{
+		id: "stance-start-all",
+		name: "Stance & Start — All Positions",
+		category: "fundamentals",
+		intensity: "low",
+		durationMin: 10,
+		equipment: ["Lines or cones"],
+		positions: ["all"],
+		positionTags: [
+			"qb",
+			"rb",
+			"wr",
+			"te",
+			"ol",
+			"dl",
+			"lb",
+			"db"
+		],
+		summary: "Universal athletic base and first-step standards that transfer to every position group.",
+		objective: "Own a balanced stance and an explosive, controlled first step.",
+		setup: ["Players on a line with 2 yards between", "Coach demonstrates three-point and two-point options by group"],
+		steps: [
+			"Set athletic two-point: feet under hips, chest tall, eyes up",
+			"Load weight on the balls of the feet without rocking heels",
+			"On clap: first step gains ground — no false step",
+			"Reset; skill does 2-pt get-off, line does 3-pt get-off for 6–8 reps",
+			"Race the first 5 yards on air only — freeze on whistle"
+		],
+		cues: [
+			"Quiet upper body; explode from the ground",
+			"First step short and violent — not a lunge",
+			"Eyes up before the go"
+		],
+		progressions: ["Add ball for skill on the start", "Add cadence for OL/QB timing"],
+		safety: ["Air only — no contact on the race"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: [
+			"youth",
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["fundamentals", "get-off"]
+	},
+	{
+		id: "form-tackle-fit-progression",
+		name: "Form Tackle Fit Progression",
+		category: "fundamentals",
+		intensity: "moderate",
+		durationMin: 14,
+		equipment: ["Shields or tackle wheels", "Soft surface preferred"],
+		positions: ["all"],
+		positionTags: [
+			"rb",
+			"lb",
+			"db",
+			"dl",
+			"te"
+		],
+		summary: "See-what-you-hit fit-up: track, break down, shoulder through, wrap, and squeeze — progressive contact.",
+		objective: "Install safe tackle geometry before any live contact.",
+		setup: ["Partners or shield holders in two lines, 5 yards apart", "Mark a breakdown cone at 3 yards from contact"],
+		steps: [
+			"Phase 1 (air): walk-through track → near foot → shoulder landmark → wrap squeeze",
+			"Phase 2 (shields): approach at 50%, break down, fit and drive 2 steps",
+			"Phase 3 (thud): 75% approach, wrap, lift or run feet, release on whistle",
+			"Alternate ball carrier / tackler each rep",
+			"Coach freezes any head-down reps immediately"
+		],
+		cues: [
+			"Eyes to the near hip / numbers — never at the ground",
+			"Chin across; back flat; wrap low-to-high",
+			"Feet keep running after contact"
+		],
+		progressions: ["Youth: stop after fit + squeeze on soft pads", "HS/adult: add angle pursuit to the fit"],
+		safety: [
+			"No launching or leaving feet",
+			"No helmet-first contact",
+			"Match size; whistle ends the rep"
+		],
+		nonContact: false,
+		contactLevel: "thud",
+		ageBands: [
+			"youth",
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: [
+			"tackle",
+			"defense",
+			"safety"
+		]
+	},
+	{
+		id: "ol-drive-block-fit",
+		name: "OL Drive Block Fit",
+		category: "fundamentals",
+		intensity: "moderate",
+		durationMin: 12,
+		equipment: ["Shields or sled", "Boards optional"],
+		positions: ["line"],
+		positionTags: ["ol"],
+		summary: "First step, hand placement, and hip drive for vertical displacement on gap schemes.",
+		objective: "Create movement without lunging or losing base.",
+		setup: ["Board or chalk line for first-step path", "Shield holder or sled 1 yard off the ball"],
+		steps: [
+			"Stance set; eyes on landmark",
+			"First step gains ground toward the play side",
+			"Hands strike inside frame — thumbs up, elbows in",
+			"Roll hips and run feet for 3–5 yards",
+			"Reset on whistle; 6–8 quality reps"
+		],
+		cues: [
+			"Low pad wins",
+			"Don't reach — step then strike",
+			"Finish with eyes up and wide base"
+		],
+		progressions: ["Mirror for backside hinge", "Add twist games later"],
+		safety: ["Shells or air vs shields", "No full live one-on-ones until fit is clean"],
+		nonContact: false,
+		contactLevel: "shells",
+		ageBands: [
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["ol", "blocking"]
+	},
+	{
+		id: "ol-zone-combo-walkthrough",
+		name: "OL Zone Combo Walkthrough",
+		category: "fundamentals",
+		intensity: "low",
+		durationMin: 12,
+		equipment: ["3 cones as DL landmarks", "Optional shields"],
+		positions: ["line"],
+		positionTags: ["ol", "te"],
+		summary: "Covered/uncovered rules and combo footwork for outside/inside zone — taught in air first.",
+		objective: "Synchronize double-team steps before any contact period.",
+		setup: ["Three cones as 1/2/3 techniques", "Pairs of OL walk the track at half speed"],
+		steps: [
+			"Call covered/uncovered for the point",
+			"First steps vertical; hips tight on the combo",
+			"Eyes to second level on climb cue",
+			"Climb to LB landmark without freelancing",
+			"Rep both play-side directions"
+		],
+		cues: [
+			"Four hands on the DL until climb",
+			"Short power steps — no crossing over",
+			"Communicate climb early"
+		],
+		progressions: ["Add shields on the point", "Tempo cadence"],
+		safety: ["Air/shells only for install days"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: [
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["ol", "zone"]
+	},
+	{
+		id: "dl-hand-combat-circuit",
+		name: "DL Hand Combat Circuit",
+		category: "fundamentals",
+		intensity: "moderate",
+		durationMin: 12,
+		equipment: ["Shields", "Partner"],
+		positions: ["line"],
+		positionTags: ["dl"],
+		summary: "Strike, separate, and clear half a man — pass-rush and run-game hands in one circuit.",
+		objective: "Win first contact with hands, not shoulders alone.",
+		setup: ["3 stations: chop, swim, rip — 4 minutes each"],
+		steps: [
+			"Station A: two-hand strike to shield, lockout, separate",
+			"Station B: swim / arm-over vs high hands",
+			"Station C: rip under and flatten to QB landmark",
+			"Rotate on whistle; quality over speed"
+		],
+		cues: [
+			"Hands inside before feet cross",
+			"Hip flip after the clear",
+			"Eyes to the ball when free"
+		],
+		progressions: ["Add get-off step before the move"],
+		safety: ["Controlled partner contact; no blindside spins into people"],
+		nonContact: false,
+		contactLevel: "shells",
+		ageBands: [
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["dl", "pass-rush"]
+	},
+	{
+		id: "qb-drop-progression",
+		name: "QB Drop Progression",
+		category: "position",
+		intensity: "low",
+		durationMin: 12,
+		equipment: ["Football", "Cones for depth"],
+		positions: ["skill"],
+		positionTags: ["qb"],
+		summary: "3-, 5-, and 7-step drops with consistent depth, balance, and eyes downfield.",
+		objective: "Own drop timing so the route tree arrives on schedule.",
+		setup: ["Mark drop depths with cones", "QB works from gun and under center if applicable"],
+		steps: [
+			"Snap catch / gun take → plant",
+			"3-step: hitch available on third",
+			"5-step: rhythm throw on plant",
+			"7-step: gather and climb if needed",
+			"Reset feet; never throw off unbalanced base"
+		],
+		cues: [
+			"Chin over toes on the plant",
+			"Ball loaded — elbow not dead",
+			"Eyes level through the drop"
+		],
+		progressions: ["Add progression read with WR air routes", "Pocket slide"],
+		safety: ["Air only"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: [
+			"youth",
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["qb"]
+	},
+	{
+		id: "qb-mesh-handoff-series",
+		name: "QB/RB Mesh & Handoff Series",
+		category: "position",
+		intensity: "low",
+		durationMin: 10,
+		equipment: ["Football", "Cone mesh point"],
+		positions: ["skill"],
+		positionTags: ["qb", "rb"],
+		summary: "Clean mesh timing for inside zone, duo, and simple RPOs — ball security first.",
+		objective: "Eliminate fumbles at the exchange.",
+		setup: ["QB and RB lines; mesh cone at landmark"],
+		steps: [
+			"RB path to mesh; eyes through the hole late",
+			"QB seat the ball; soft hands from RB",
+			"Ride options on air (give / pull verbal)",
+			"Switch sides; 8 clean reps each"
+		],
+		cues: [
+			"Soft mesh — don't stab the ball",
+			"RB near arm up, far arm under",
+			"QB eyes sell the fake when pulling"
+		],
+		progressions: ["Add read DL air key for RPO"],
+		safety: ["No contact at mesh"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: [
+			"youth",
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["qb", "rb"]
+	},
+	{
+		id: "rb-zone-track-cuts",
+		name: "RB Zone Track & Cut",
+		category: "position",
+		intensity: "moderate",
+		durationMin: 12,
+		equipment: ["Cones as OL landmarks", "Football"],
+		positions: ["skill"],
+		positionTags: ["rb"],
+		summary: "Press the line, one decisive cut, and accelerate — zone vision without freelancing.",
+		objective: "Train patience then explosion on zone tracks.",
+		setup: ["Cone wall representing OL", "Cut cone at 4–5 yards"],
+		steps: [
+			"Receive mesh on air",
+			"Press track toward frontside",
+			"One cut off the cone landmark",
+			"Burst 10 yards; secure ball high and tight",
+			"Alternate cut directions"
+		],
+		cues: [
+			"Don't bounce early",
+			"Plant outside foot; rip through",
+			"Pad level drops into the cut"
+		],
+		progressions: ["Add pursuit defender on air (tag)", "Shells fit-up"],
+		safety: ["Air or tag only unless scheduled thud"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: [
+			"youth",
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["rb", "vision"]
+	},
+	{
+		id: "wr-route-tree-air",
+		name: "WR Route Tree — Air",
+		category: "position",
+		intensity: "moderate",
+		durationMin: 14,
+		equipment: ["Footballs", "Route cones"],
+		positions: ["skill"],
+		positionTags: [
+			"wr",
+			"te",
+			"qb"
+		],
+		summary: "Full tree at teaching speed: hitch, slant, out, dig, post, go — with release options.",
+		objective: "Sync stems and breaks with QB timing.",
+		setup: ["Two WR lines; QB or coach thrower"],
+		steps: [
+			"Release off LOS — jab or speed",
+			"Stem sell vertical for 3–8 yards by route",
+			"Break on time; hands ready early",
+			"Catch, tuck, two steps of YAC air",
+			"Rotate routes every 4 reps"
+		],
+		cues: [
+			"Sell the stem before the break",
+			"Sink hips on the cut",
+			"Eyes through the ball to the tuck"
+		],
+		progressions: ["Press release vs DB air", "Tempo play clock"],
+		safety: ["Air; no crack blocks in this period"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: [
+			"youth",
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["wr", "routes"]
+	},
+	{
+		id: "catch-and-secure-gauntlet",
+		name: "Catch & Secure Gauntlet",
+		category: "position",
+		intensity: "moderate",
+		durationMin: 10,
+		equipment: ["Footballs", "Soft noodles or towels"],
+		positions: ["skill"],
+		positionTags: [
+			"wr",
+			"te",
+			"rb",
+			"db"
+		],
+		summary: "High-point and body catches into an immediate high-and-tight tuck through distraction.",
+		objective: "Eliminate bobbles and strip fumbles after the catch.",
+		setup: ["Gauntlet lane 10–15 yards; coaches with noodles mid-lane"],
+		steps: [
+			"Receive throw at the entry",
+			"Tuck immediately — elbow rib, ball high",
+			"Run through soft noodle taps",
+			"Finish through the end cone",
+			"Switch hands each rep"
+		],
+		cues: [
+			"Catch with hands, finish with tuck",
+			"Don't turn the ball out on contact",
+			"Eyes up after secure"
+		],
+		progressions: ["Contested high-point before gauntlet"],
+		safety: ["Noodles/towels only — no punching the ball carrier down"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: [
+			"youth",
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["catch", "ball-security"]
+	},
+	{
+		id: "te-release-and-seam",
+		name: "TE Release & Seam",
+		category: "position",
+		intensity: "moderate",
+		durationMin: 12,
+		equipment: ["Football", "Cone seam landmark"],
+		positions: ["big-skill"],
+		positionTags: ["te", "qb"],
+		summary: "Inline and flexed releases into seam/flat options with reliable hands.",
+		objective: "Win early leverage vs LBs and find the window.",
+		setup: ["TE on ball and flexed; QB timed throws"],
+		steps: [
+			"Release vs air LB landmark",
+			"Stem vertical; read for seam vs dig tag",
+			"Catch and turn upfield",
+			"Alternate flat release every other rep"
+		],
+		cues: [
+			"Get skinny through the gap",
+			"Hands ready at 12–15 yards on seam",
+			"Find the ball early"
+		],
+		progressions: ["Add LB air trail", "Play-action fake first"],
+		safety: ["Air"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: [
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["te"]
+	},
+	{
+		id: "lb-scrape-and-fit",
+		name: "LB Scrape & Fit",
+		category: "position",
+		intensity: "moderate",
+		durationMin: 12,
+		equipment: ["Cones for OL wall", "Shield optional"],
+		positions: ["big-skill"],
+		positionTags: ["lb"],
+		summary: "Read keys, scrape without false steps, and fit the correct gap with tackle-ready pad level.",
+		objective: "Eliminate wrong-gap fills on zone/gap schemes.",
+		setup: ["Cone OL; ball path marked"],
+		steps: [
+			"Pre-snap align; eyes to keys",
+			"Shuffle/scrape on flow",
+			"Trigger downhill on pull/zone track",
+			"Fit shield or air RB at pad level",
+			"Reset; reverse flow"
+		],
+		cues: [
+			"Don't jump the first step of the guard",
+			"Shoulders square on the fit",
+			"Come to balance before contact"
+		],
+		progressions: ["Thud fit on shields", "Add play-action pass drop"],
+		safety: ["Air or shields until technique holds"],
+		nonContact: false,
+		contactLevel: "shells",
+		ageBands: [
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["lb", "run-fit"]
+	},
+	{
+		id: "db-backpedal-break",
+		name: "DB Backpedal & Break",
+		category: "position",
+		intensity: "moderate",
+		durationMin: 12,
+		equipment: ["Cones", "Football"],
+		positions: ["skill"],
+		positionTags: ["db"],
+		summary: "Quiet pedal, hip transition, and drive on the throw — man and zone base movement.",
+		objective: "Change direction without false steps or crossing over.",
+		setup: ["5–10 yard pedal line; break cones left/right"],
+		steps: [
+			"Start in break-down; pedal on cadence",
+			"On color call: break plant and drive",
+			"Catch ball or touch cone",
+			"Reset; mix speed turns and open hips"
+		],
+		cues: [
+			"Chin over toes in pedal",
+			"Push the ground — don't reach back",
+			"Eyes to WR then to ball"
+		],
+		progressions: ["Mirror live WR air routes", "Press alignment"],
+		safety: ["Air; controlled collisions only if scheduled separately"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: [
+			"youth",
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["db", "coverage"]
+	},
+	{
+		id: "pursuit-angle-air",
+		name: "Pursuit Angle — Air",
+		category: "fundamentals",
+		intensity: "moderate",
+		durationMin: 12,
+		equipment: ["Cones", "Ball carrier"],
+		positions: ["all"],
+		positionTags: [
+			"dl",
+			"lb",
+			"db",
+			"st"
+		],
+		summary: "Team pursuit drill teaching landmark angles, leverage, and safe breakdown — no free shots.",
+		objective: "Arrive under control on the correct angle every play.",
+		setup: ["Ball carrier path down the sideline or hash", "Defenders staggered at different depths"],
+		steps: [
+			"On snap, ball carrier jogs then accelerates",
+			"Defenders take landmark angles — not straight-line freelances",
+			"Break down at 2 yards; tag with two hands",
+			"Whistle freezes all feet",
+			"Reset opposite direction"
+		],
+		cues: [
+			"Aim for where he will be",
+			"Never leave your feet",
+			"Talk the ball all the way"
+		],
+		progressions: ["Thud form fit at the end for older levels"],
+		safety: ["Tags or form fit only", "No high-speed blindside collisions"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: [
+			"youth",
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["pursuit", "team"]
+	},
+	{
+		id: "st-coverage-lanes-air",
+		name: "ST Coverage Lanes — Air",
+		category: "special-teams",
+		intensity: "moderate",
+		durationMin: 12,
+		equipment: ["Cones for lanes", "Kicking tee optional"],
+		positions: ["specialists"],
+		positionTags: [
+			"st",
+			"db",
+			"lb"
+		],
+		summary: "Lane integrity on kickoff/punt coverage with safe breakdown rules near the returner.",
+		objective: "Stay in lanes and finish under control.",
+		setup: ["Lane cones every 5 yards across the field", "Returner at landmark; no full-speed pile"],
+		steps: [
+			"Sprint in assigned lane",
+			"Converge gradually — don't all hit the same seam",
+			"Break down at 5 yards from returner",
+			"Two-hand tag or form fit on coach call",
+			"Returner fair-catch option every other rep"
+		],
+		cues: [
+			"Width first, then fold",
+			"Eyes on returner through the breakdown",
+			"No blindside cheap shots"
+		],
+		progressions: ["Add gunner release air work"],
+		safety: ["Strict whistle discipline", "Youth: tag only near returner"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: [
+			"youth",
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["special-teams"]
+	},
+	{
+		id: "team-tempo-install",
+		name: "Team Tempo Install",
+		category: "team",
+		intensity: "moderate",
+		durationMin: 20,
+		equipment: ["Full field markers", "Script cards"],
+		positions: ["all"],
+		summary: "Offense vs air defense (or look team) running scripted plays on a play clock — install speed.",
+		objective: "Rep scheme with urgency and clean communication.",
+		setup: [
+			"Script 8–12 plays",
+			"Defense in air looks or shells as planned",
+			"Play clock visible"
+		],
+		steps: [
+			"Huddle or no-huddle as installed",
+			"Snap by cadence; execute assignment",
+			"Whistle at 3–4 seconds or ball dead",
+			"Next play immediately — coach teach on the run",
+			"Flip field halfway"
+		],
+		cues: [
+			"Know your job before the ball is set",
+			"Communicate protections/coverage loud",
+			"Tempo without panic"
+		],
+		progressions: [
+			"Shells",
+			"Thud periods",
+			"Limited live"
+		],
+		safety: ["Contact level pre-declared", "No late hits after whistle"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: [
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["team", "install"]
+	},
+	{
+		id: "inside-run-thud",
+		name: "Inside Run — Thud Period",
+		category: "team",
+		intensity: "high",
+		durationMin: 15,
+		equipment: ["Full pads", "Inside box cones"],
+		positions: ["all"],
+		summary: "Competitive inside run period: form tackle finish, no cut blocks, whistle-fast.",
+		objective: "Train gap integrity and wrap tackling at game pad level.",
+		setup: [
+			"Hash-to-hash box",
+			"Matched size groups when possible",
+			"Clear thud rules posted"
+		],
+		steps: [
+			"Offense runs inside concepts only",
+			"Defense fits and form tackles to controlled stop",
+			"Whistle ends feet immediately",
+			"Rotate units every 4–6 plays",
+			"Water after the period"
+		],
+		cues: [
+			"Pad under pad",
+			"Wrap and squeeze — no targeting",
+			"Offensive finish: fall forward legally"
+		],
+		progressions: ["Add RPO tags air-only on second team"],
+		safety: [
+			"No blindside cracks",
+			"No pile jumping",
+			"Pull players showing poor head position"
+		],
+		nonContact: false,
+		contactLevel: "thud",
+		ageBands: [
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["team", "run"]
+	},
+	{
+		id: "seven-on-seven",
+		name: "7-on-7 Pass Skeleton",
+		category: "team",
+		intensity: "moderate",
+		durationMin: 18,
+		equipment: ["Footballs", "Field"],
+		positions: ["skill", "big-skill"],
+		positionTags: [
+			"qb",
+			"wr",
+			"te",
+			"rb",
+			"lb",
+			"db"
+		],
+		summary: "Pass game install and competition without OL/DL contact — coverage vs routes.",
+		objective: "Time routes, reads, and coverage rules at competitive tempo.",
+		setup: ["No OL/DL (or air rush cones)", "Script + competitive periods"],
+		steps: [
+			"Offense snaps on cadence",
+			"Defense plays called coverage",
+			"Throw completed → 2-yard YAC max air",
+			"Rotate coverage families",
+			"Score the period if desired"
+		],
+		cues: [
+			"QB: full progression",
+			"WR: stem discipline",
+			"DB: break on the ball, not the hips only"
+		],
+		progressions: ["Add rush cones / timed throw clock"],
+		safety: ["No tackling — two-hand touch or break up only"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: [
+			"youth",
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["pass", "7v7"]
+	},
+	{
+		id: "blitz-pickup-air",
+		name: "Blitz Pickup — Air",
+		category: "fundamentals",
+		intensity: "moderate",
+		durationMin: 12,
+		equipment: ["Cones as rushers", "Football"],
+		positions: [
+			"skill",
+			"line",
+			"big-skill"
+		],
+		positionTags: [
+			"ol",
+			"rb",
+			"qb",
+			"te",
+			"lb",
+			"db"
+		],
+		summary: "Protection ID and hot rules vs dog/blitz looks without live collisions.",
+		objective: "Make the hot throw or the right pickup every time.",
+		setup: ["Defense shows pressure looks with cones or walk-through players", "Offense calls protection"],
+		steps: [
+			"Pre-snap ID the mike / pressure",
+			"Snap; execute pickup or hot",
+			"Freeze on whistle and re-teach if wrong",
+			"Rep 3 pressure families"
+		],
+		cues: [
+			"Call it loud",
+			"RB: inside-out on the free runner",
+			"QB: know the hot before the snap"
+		],
+		progressions: ["Shells fit on pickups for older levels"],
+		safety: ["Air install first"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: ["high-school", "college-adult"],
+		tags: ["protection", "pressure"]
+	},
+	{
+		id: "recovery-mobility-pro",
+		name: "Recovery & Soft Tissue Reset",
+		category: "cooldown",
+		intensity: "low",
+		durationMin: 12,
+		equipment: ["Bands optional", "Foam rollers optional"],
+		positions: ["all"],
+		summary: "Post-practice sequence for hips, hamstrings, T-spine, and breathing downshift.",
+		objective: "Leave practice better than you arrived — long-term availability.",
+		setup: ["Players spaced on turf; quiet coaching voice"],
+		steps: [
+			"2 minutes nasal breathing on back",
+			"World's greatest stretch both sides",
+			"Hamstring and hip flexor long holds (45–60s)",
+			"T-spine rotations",
+			"Team recap: one standard won today"
+		],
+		cues: [
+			"Never bounce stretches",
+			"Breathe into tight areas",
+			"Effort still shows in posture"
+		],
+		progressions: ["Add contrast showers education for older athletes"],
+		safety: ["No forced end-range on sore players"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: [
+			"youth",
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["recovery"]
+	},
+	{
+		id: "youth-flag-to-tackle-bridge",
+		name: "Youth Flag-to-Tackle Bridge",
+		category: "fundamentals",
+		intensity: "low",
+		durationMin: 15,
+		equipment: ["Soft shields", "Flags optional"],
+		positions: ["all"],
+		summary: "Bridge activity for young athletes moving from flag to tackle: track, breakdown, hug-the-pad.",
+		objective: "Teach safe contact geometry without fear or recklessness.",
+		setup: ["Soft shields only; grass preferred"],
+		steps: [
+			"Mirror flag pull footwork first",
+			"Approach shield at jog; break down",
+			"Hug pad with eyes up; squeeze 2 seconds",
+			"Celebrate control — not the hit",
+			"Partners switch"
+		],
+		cues: [
+			"Soft feet into contact",
+			"Hug, don't launch",
+			"Heads up always"
+		],
+		progressions: ["Slow walk form tackle on soft surface"],
+		safety: ["No player-vs-player live tackling in this drill", "Stop if any head contact occurs"],
+		nonContact: false,
+		contactLevel: "shells",
+		ageBands: ["youth", "middle"],
+		tags: ["youth", "tackle-intro"]
+	},
+	{
+		id: "redzone-situational",
+		name: "Red Zone Situational Period",
+		category: "team",
+		intensity: "high",
+		durationMin: 15,
+		equipment: ["Field inside the 20"],
+		positions: ["all"],
+		summary: "Compressed-field offense vs defense with pre-declared contact level and clock rules.",
+		objective: "Win the short field with discipline and clear rules.",
+		setup: ["Ball on the 20, 15, 10, 5", "Score the period"],
+		steps: [
+			"Offense: pre-called red-zone menu",
+			"Defense: goal-line / compressed coverages",
+			"Contact per plan (air, thud, or limited live)",
+			"Teach immediately on errors"
+		],
+		cues: [
+			"No penalties in the red zone",
+			"Ball security first",
+			"Defense: gap integrity over freelancing"
+		],
+		progressions: ["Two-minute red-zone"],
+		safety: ["Declare contact before the first snap"],
+		nonContact: false,
+		contactLevel: "thud",
+		ageBands: ["high-school", "college-adult"],
+		tags: ["situational", "redzone"]
+	},
+	{
+		id: "two-minute-drill",
+		name: "Two-Minute Drill",
+		category: "team",
+		intensity: "high",
+		durationMin: 12,
+		equipment: ["Play clock", "Field"],
+		positions: ["all"],
+		summary: "Clock, spikes, timeouts, and sideline management under stress — usually air or shells.",
+		objective: "Execute under time pressure without chaos.",
+		setup: [
+			"1:30–2:00 on the clock",
+			"2–3 timeouts",
+			"Scripted defense looks"
+		],
+		steps: [
+			"Start midfield or plus territory",
+			"No-huddle communication",
+			"Use clock rules correctly (spike/kneel/OOB)",
+			"End with FG team if applicable"
+		],
+		cues: [
+			"Know down and distance before the snap",
+			"Get out of bounds when needed",
+			"QB: clock in the headset of your brain"
+		],
+		progressions: ["Add true pass rush air cones"],
+		safety: ["Usually air; no cheap late hits"],
+		nonContact: true,
+		contactLevel: "air",
+		ageBands: [
+			"middle",
+			"high-school",
+			"college-adult"
+		],
+		tags: ["situational", "clock"]
+	}
+];
+var CATEGORY_LABELS = {
+	warmup: "Warm-up",
+	conditioning: "Conditioning",
+	agility: "Agility",
+	strength: "Strength",
+	position: "Position",
+	fundamentals: "Fundamentals",
+	team: "Team / install",
+	"special-teams": "Special teams",
+	cooldown: "Cool-down"
+};
+var INTENSITY_LABELS = {
+	low: "Low",
+	moderate: "Moderate",
+	high: "High"
+};
+var POSITION_LABELS = {
+	all: "All positions",
+	skill: "Skill (WR/DB/RB)",
+	line: "Line (OL/DL)",
+	"big-skill": "Big skill (TE/LB)",
+	specialists: "Specialists"
+};
+var coreDrills = [
+	{
+		id: "dynamic-warmup-circuit",
+		name: "Dynamic Warm-up Circuit",
+		category: "warmup",
+		intensity: "low",
+		durationMin: 12,
+		equipment: ["Cones (optional)"],
+		positions: ["all"],
+		summary: "Full-body activation with high knees, scoop stretch, and multi-plane mobility — raises heart rate and opens hips, ankles, and posterior chain before sprint work.",
+		objective: "Prime tissue temperature and movement quality without fatigue.",
+		setup: [
+			"Mark a 10–15 yard lane on grass or turf",
+			"Space players 3–4 yards apart across the lane",
+			"Coach stands at the finish to call the next movement"
+		],
+		steps: [
+			"Jog down and back at 50% effort (1 rep)",
+			"High knees 10 yards — drive knee to hip height with arm pump, walk back",
+			"High knees 5 yards into walking scoop stretch 5 yards: heel plant, toe up, reach past the foot (hinge at hips)",
+			"Turn and repeat high knees + scoop with opposite lead leg",
+			"Butt kicks 10 yards, walk back",
+			"Walking lunges with overhead reach 10 yards",
+			"Karaoke / carioca both directions",
+			"Open / close the gate hip openers 10 yards",
+			"A-skips into light acceleration finish"
+		],
+		cues: [
+			"Tall posture — eyes up, not at the ground",
+			"Quiet feet on high knees; drive the knee, not the heel",
+			"Flat back on the scoop — hinge at hips, don't lock the knee",
+			"Land softly; never force range of motion"
+		],
+		progressions: [
+			"Increase high-knee segment to 8 yards before the scoop",
+			"Add arm circles and world's greatest stretch between lanes",
+			"Finish with 2 build-up sprints to 75%"
+		],
+		safety: [
+			"Do not skip this on cool mornings",
+			"Players with calf/hamstring history go slower on skips and scoops",
+			"Avoid locking the knee on the scoop stretch"
+		],
+		nonContact: true
+	},
+	{
+		id: "hiit-gassers",
+		name: "Sideline-to-Sideline Gassers",
+		category: "conditioning",
+		intensity: "high",
+		durationMin: 12,
+		restSec: 60,
+		sets: 6,
+		reps: "1 width out-and-back",
+		equipment: ["Field hash marks or sidelines", "Whistle"],
+		positions: ["all"],
+		summary: "Classic football conditioning: continuous width runs with controlled rest to build repeat sprint ability.",
+		objective: "Train anaerobic capacity and mental toughness for late-drive snaps.",
+		setup: [
+			"Use full field width (sideline to sideline)",
+			"Group by position or fitness if squad sizes differ",
+			"Coach times every rep; rest starts when last player finishes"
+		],
+		steps: [
+			"On whistle: sprint sideline → opposite sideline → back",
+			"Touch the line with hand each turn",
+			"Walk or hands-on-hips recovery for 45–75 seconds",
+			"Complete 4–8 reps depending on camp day"
+		],
+		cues: [
+			"Drive arms; don't coast into the turn",
+			"Plant outside foot and cut low",
+			"Stay in your lane — no contact"
+		],
+		progressions: [
+			"Day 1: 4 reps @ 75s rest",
+			"Day 5: 6 reps @ 60s rest",
+			"Day 10: 8 reps @ 45s rest"
+		],
+		safety: ["Non-contact only — no racing into collisions", "Hydrate between sets; pull players showing form collapse"],
+		nonContact: true
+	},
+	{
+		id: "110-yard-tempo",
+		name: "110s Tempo Runs",
+		category: "conditioning",
+		intensity: "moderate",
+		durationMin: 15,
+		restSec: 45,
+		sets: 8,
+		reps: "110 yards",
+		equipment: ["End zone to end zone markers"],
+		positions: ["all"],
+		summary: "Controlled 110-yard runs at 70–80% to build aerobic base without max-effort neural fatigue.",
+		objective: "Establish work capacity for multi-period practices.",
+		setup: ["Run goal line to opposite 10-yard line (or full 110)", "Players start staggered every 3 seconds if large group"],
+		steps: [
+			"Jog into a smooth acceleration to 70–80% pace",
+			"Maintain form through the finish — no leaning back",
+			"Walk return or walk the sideline for prescribed rest",
+			"Repeat for assigned volume by position group"
+		],
+		cues: [
+			"Smooth rhythm, not a full sprint",
+			"Relaxed face and shoulders",
+			"Even splits — don't go out too fast"
+		],
+		progressions: [
+			"Skill: 10–12 reps",
+			"Big skill: 8–10 reps",
+			"Line: 6–8 reps"
+		],
+		safety: ["Not max effort — pull back if players are sprinting 95%+", "Increase volume only after two solid sessions"],
+		nonContact: true
+	},
+	{
+		id: "sprint-ladder",
+		name: "Sprint Ladder Intervals",
+		category: "conditioning",
+		intensity: "high",
+		durationMin: 14,
+		equipment: ["Cones at 10, 20, 30, 40 yards"],
+		positions: ["all"],
+		summary: "Ascending and descending sprint distances that mirror play-length efforts and recoveries.",
+		objective: "Improve acceleration and recover-to-sprint capacity.",
+		setup: ["Mark cones at 10, 20, 30, and 40 yards from a start line", "One line of players; next group starts when first reaches 20"],
+		steps: [
+			"Sprint 10 yards, walk back",
+			"Sprint 20, walk back",
+			"Sprint 30, walk back",
+			"Sprint 40, walk back",
+			"Descend: 30, 20, 10",
+			"Rest 2 minutes, optional second ladder"
+		],
+		cues: [
+			"Explode first 3 steps",
+			"Full stop at each cone — no rounding",
+			"Walk recovery keeps heart rate productive"
+		],
+		progressions: ["Add a second ladder mid-camp", "Reduce walk rest by 5 yards"],
+		safety: ["Check footwear and field surface before first max acceleration", "No competitive contact at the finish line"],
+		nonContact: true
+	},
+	{
+		id: "hill-or-bleacher",
+		name: "Hill / Bleacher Power Runs",
+		category: "conditioning",
+		intensity: "high",
+		durationMin: 12,
+		restSec: 90,
+		sets: 8,
+		equipment: ["Moderate hill or stadium stairs", "Water"],
+		positions: ["all"],
+		summary: "Short incline efforts that build posterior chain power and conditioning when field space is limited.",
+		objective: "Develop force production and grit with low joint impact options.",
+		setup: ["Choose a moderate incline (not extreme)", "Clear a safe path; mark start and ~20–30 yard finish"],
+		steps: [
+			"10-minute full-body warm-up first",
+			"Sprint or drive hard uphill 15–25 seconds",
+			"Walk down for full recovery",
+			"Complete 6–10 total efforts"
+		],
+		cues: [
+			"Lean slightly into the hill, drive knees",
+			"Powerful arm swing",
+			"Do not overstride"
+		],
+		progressions: ["Increase efforts from 6 → 10 across week 1", "Add 5 seconds of work"],
+		safety: ["Skip if surface is wet/slippery", "Stairs: every step, not double-stepping for beginners"],
+		nonContact: true
+	},
+	{
+		id: "agility-ladder-series",
+		name: "Agility Ladder Series",
+		category: "agility",
+		intensity: "moderate",
+		durationMin: 10,
+		equipment: ["Agility ladder(s)", "Cones"],
+		positions: ["all"],
+		summary: "Quick-feet patterns that improve coordination and prepare ankles for change-of-direction work.",
+		objective: "Sharpen foot speed and rhythm without contact.",
+		setup: ["Lay 1–2 ladders parallel", "Queue players; continuous flow every 4 seconds"],
+		steps: [
+			"One-in each square (forward)",
+			"Two-in each square",
+			"Lateral shuffle two-in",
+			"Icky shuffle",
+			"Hopscotch (two-in, one-out)",
+			"Finish each pattern with a 5-yard burst"
+		],
+		cues: [
+			"Eyes up after first two patterns",
+			"Light contacts — dance on the balls of the feet",
+			"Arms stay compact and active"
+		],
+		progressions: ["Mirror patterns backward", "Add ball catch on exit for skill players"],
+		safety: ["Reset ladder if rungs bunch", "No racing through first learning reps"],
+		nonContact: true
+	},
+	{
+		id: "pro-agility-5-10-5",
+		name: "Pro Agility (5-10-5)",
+		category: "agility",
+		intensity: "high",
+		durationMin: 8,
+		restSec: 60,
+		sets: 4,
+		equipment: ["3 cones", "Stopwatch (optional)"],
+		positions: ["all"],
+		summary: "Standard combine COD drill teaching plant, redirect, and re-acceleration — zero contact.",
+		objective: "Train change of direction and hip control.",
+		setup: ["Place cones in a straight line 5 yards apart (total 10 yards)", "Start straddling the middle cone"],
+		steps: [
+			"On command, sprint 5 yards to the right, touch the line",
+			"Sprint 10 yards across to the far cone, touch",
+			"Sprint 5 yards back through the middle",
+			"Rest fully; alternate starting direction each rep"
+		],
+		cues: [
+			"Low plant, outside hand can touch the line",
+			"Stay square — don't spin",
+			"Explode out of the second cut"
+		],
+		progressions: ["Time reps mid-camp for baseline", "Reactive start on visual cue"],
+		safety: ["Clear plant surface of loose turf", "Limit max-effort timed reps early in camp"],
+		nonContact: true
+	},
+	{
+		id: "t-drill",
+		name: "T-Drill",
+		category: "agility",
+		intensity: "high",
+		durationMin: 8,
+		restSec: 75,
+		sets: 4,
+		equipment: ["4 cones"],
+		positions: [
+			"skill",
+			"big-skill",
+			"specialists"
+		],
+		summary: "Forward sprint, lateral shuffle, and backpedal pattern for multi-plane conditioning.",
+		objective: "Blend linear speed with lateral control.",
+		setup: ["Cones form a T: base 10 yards from crossbar, crossbar 5 yards each side"],
+		steps: [
+			"Sprint from base to the top center cone, touch",
+			"Shuffle right to cone, touch",
+			"Shuffle left across to far cone, touch",
+			"Shuffle back to center, then backpedal to start"
+		],
+		cues: [
+			"Stay low on shuffles; feet don't cross",
+			"Touch with outside hand",
+			"Backpedal under control — don't fall back"
+		],
+		progressions: ["Add a finish sprint instead of backpedal for skill groups"],
+		safety: ["Emphasize controlled backpedal to protect ankles"],
+		nonContact: true
+	},
+	{
+		id: "cone-weave-burst",
+		name: "Cone Weave + Burst",
+		category: "agility",
+		intensity: "moderate",
+		durationMin: 8,
+		equipment: ["6–8 cones"],
+		positions: ["all"],
+		summary: "Slalom weave that teaches body lean and short-space acceleration common on broken plays.",
+		objective: "Improve spatial awareness and cutting efficiency.",
+		setup: ["Place cones in a zig-zag every 3–4 yards for 20–25 total yards"],
+		steps: [
+			"Weave outside each cone with short choppy steps",
+			"At the last cone, explode 10 yards in a straight sprint",
+			"Jog return; next player goes"
+		],
+		cues: [
+			"Plant outside foot; lean into the turn",
+			"Eyes up looking for the next cone early",
+			"Burst must be full speed"
+		],
+		progressions: ["Mirror the weave with a ball for RBs/WRs"],
+		safety: ["No two players in the weave at once on narrow setups"],
+		nonContact: true
+	},
+	{
+		id: "bodyweight-circuit",
+		name: "Football Bodyweight Circuit",
+		category: "strength",
+		intensity: "moderate",
+		durationMin: 14,
+		sets: 3,
+		equipment: ["None (optional mats)"],
+		positions: ["all"],
+		summary: "No-equipment strength circuit for early camp when pads and weight room access are limited.",
+		objective: "Build muscular endurance that supports contact phases later.",
+		setup: ["Mark 4–5 stations in a circle; 40–45 seconds work / 20 rest"],
+		steps: [
+			"Station 1: Push-ups",
+			"Station 2: Bodyweight squats or jump squats (low amplitude day 1)",
+			"Station 3: Plank or shoulder taps",
+			"Station 4: Walking lunges",
+			"Station 5: Glute bridges",
+			"Rotate for 3 rounds"
+		],
+		cues: [
+			"Quality over count — stop 2 reps before form breaks",
+			"Brace core on every station",
+			"Breathe; don't hold breath"
+		],
+		progressions: ["Add tempo (3-second lower) mid-week", "Swap jump squats for line groups only after day 4"],
+		safety: ["Offer knee-down push-up variation", "No competitive max push-up contests day 1"],
+		nonContact: true
+	},
+	{
+		id: "sled-drive",
+		name: "Sled Drive / Prowler Push",
+		category: "strength",
+		intensity: "high",
+		durationMin: 12,
+		restSec: 90,
+		sets: 6,
+		equipment: [
+			"Sled or prowler",
+			"Weight plates",
+			"20–30 yard lane"
+		],
+		positions: [
+			"line",
+			"big-skill",
+			"all"
+		],
+		summary: "Horizontal force production without partner contact — ideal non-contact trench prep.",
+		objective: "Train drive-leg power and conditioning under load.",
+		setup: ["Load sled light-to-moderate (players should finish strong)", "Mark 20–30 yard lanes"],
+		steps: [
+			"Athletic stance, hands on poles or pads",
+			"Drive 20–30 yards with short, powerful steps",
+			"Walk back with sled or partner swap",
+			"Complete 4–8 total drives"
+		],
+		cues: [
+			"Flat back, eyes slightly forward",
+			"Drive the ground away — don't just lean",
+			"Keep hips low through the finish"
+		],
+		progressions: ["Increase load after technique is clean", "Add backward drag for posterior chain"],
+		safety: ["Spot slippery turf", "Never put beginners on max load day one"],
+		nonContact: true
+	},
+	{
+		id: "plyo-power-pack",
+		name: "Plyometric Power Pack",
+		category: "strength",
+		intensity: "high",
+		durationMin: 10,
+		sets: 3,
+		equipment: ["Boxes 12–18 in (optional)", "Open grass"],
+		positions: ["all"],
+		summary: "Low-volume explosive jumps to reawaken elastic strength after summer rest.",
+		objective: "Improve rate of force development safely.",
+		setup: ["Soft surface preferred; boxes only if stable and dry"],
+		steps: [
+			"Squat jumps × 5",
+			"Broad jumps × 4",
+			"Lateral bounds × 4/side",
+			"Optional box step-offs to stick landing × 4",
+			"Rest 90 seconds between rounds; 3 rounds"
+		],
+		cues: [
+			"Quiet, soft landings — absorb with hips",
+			"Full reset between jumps early in camp",
+			"Arms drive the jump"
+		],
+		progressions: ["Add a second set mid-camp", "Introduce low box jumps after week 1"],
+		safety: ["Stop if landings get noisy or knees cave", "No depth jumps in first 5 practices"],
+		nonContact: true
+	},
+	{
+		id: "wr-db-release-mirror",
+		name: "WR/DB Release & Mirror",
+		category: "position",
+		intensity: "moderate",
+		durationMin: 12,
+		equipment: ["Cones", "Footballs (optional)"],
+		positions: ["skill"],
+		summary: "Non-contact release, stem, and mirror footwork for receivers and defensive backs.",
+		objective: "Condition with position-specific movement patterns.",
+		setup: ["Pair skill players; 10–12 yard routes / zones"],
+		steps: [
+			"WR: release off LOS with three-step stem, break at 8–10 yards",
+			"DB: mirror without hands — hip and feet only",
+			"Reset; swap roles every 4 reps",
+			"Finish period with 4 timed 20-yard bursts"
+		],
+		cues: [
+			"DB: stay low, don't reach",
+			"WR: sell vertical stem",
+			"No jam, no grab — pure movement"
+		],
+		progressions: ["Add ball on the break for WR reps only"],
+		safety: ["Strictly no hand fighting in non-contact phase"],
+		nonContact: true
+	},
+	{
+		id: "ol-dl-getoff-board",
+		name: "OL/DL Get-Off Board",
+		category: "position",
+		intensity: "moderate",
+		durationMin: 10,
+		equipment: ["Chute or low bag optional", "Ball on stick or coach visual"],
+		positions: ["line"],
+		summary: "Explosive first-step and stance work for linemen without pad collision.",
+		objective: "Train stance, start, and short-area power.",
+		setup: ["Form 2–3 lines on the ball; 5-yard finish"],
+		steps: [
+			"Perfect stance for 3 seconds",
+			"On ball movement, explode 5 yards",
+			"Reset with coaching on hand placement and pad level (air)",
+			"Rotate 8–12 quality reps"
+		],
+		cues: [
+			"Weight on inside of feet",
+			"First step gains ground, not height",
+			"Hands strike air targets — no teammate contact"
+		],
+		progressions: ["Add sled on finish for 5 yards", "Mirror steps for pass pro slides (air)"],
+		safety: ["No live bull rush or punch on a partner yet"],
+		nonContact: true
+	},
+	{
+		id: "lb-te-zone-drops",
+		name: "LB/TE Zone Drops & Crosses",
+		category: "position",
+		intensity: "moderate",
+		durationMin: 12,
+		equipment: ["Cones for landmarks", "Football"],
+		positions: ["big-skill"],
+		summary: "Coverage drops, angle runs, and cross-field conditioning for linebackers and tight ends.",
+		objective: "Condition while engraving landmark drops and route depths.",
+		setup: ["Hash-to-hash landmarks for hook/curl and flat"],
+		steps: [
+			"LB: drop to landmark on coach signal, plant, break on thrown ball (catch optional)",
+			"TE: run cross / dig at assigned depth, settle, jog back",
+			"Alternate 45-second waves for 10–12 minutes"
+		],
+		cues: [
+			"Open hips early on the drop",
+			"Throttle down under control into the landmark",
+			"Eyes to QB on the break"
+		],
+		progressions: ["Add tempo — less rest between waves day 6+"],
+		safety: ["No collision on settling routes"],
+		nonContact: true
+	},
+	{
+		id: "specialists-tempo",
+		name: "Specialists Tempo Circuit",
+		category: "position",
+		intensity: "moderate",
+		durationMin: 12,
+		equipment: ["K-ball / footballs", "Net or uprights"],
+		positions: ["specialists"],
+		summary: "Conditioning tailored for kickers, punters, and long snappers with intermittent work.",
+		objective: "Maintain skill quality while building general fitness.",
+		setup: ["Separate specialists for part of period; rejoin team for finishers"],
+		steps: [
+			"Dynamic lower-body warm-up 4 minutes",
+			"Approach strides × 8",
+			"Live technique reps with full recovery (quality first)",
+			"Between sets: 20-yard shuttles × 4",
+			"Finish with team tempo 110s if scheduled"
+		],
+		cues: ["Never condition with a fatigued plant leg on max kicks", "Quality of contact > volume"],
+		progressions: ["Increase shuttle volume mid-camp"],
+		safety: ["Separate max-effort kick days from high running volume"],
+		nonContact: true
+	},
+	{
+		id: "shuttle-suicide",
+		name: "Short-Field Suicides",
+		category: "conditioning",
+		intensity: "high",
+		durationMin: 10,
+		restSec: 120,
+		sets: 3,
+		equipment: ["Cones at 5, 10, 15, 20 yards"],
+		positions: ["all"],
+		summary: "Progressive touch-and-go sprints that spike heart rate quickly — use sparingly early camp.",
+		objective: "Peak anaerobic finish for end-of-practice standards.",
+		setup: ["Cones every 5 yards to 20; one line per group of 6–8"],
+		steps: [
+			"Sprint 5 and back, 10 and back, 15 and back, 20 and back",
+			"Touch each line with hand",
+			"Full rest 90–120 seconds; repeat 2–4 total sets"
+		],
+		cues: [
+			"Stay low on turns",
+			"Even effort — don't blow up on the first 5",
+			"Team standard: everyone finishes together when possible"
+		],
+		progressions: ["Day 2: 2 sets → Day 8: 4 sets"],
+		safety: ["Not for the first practice of camp", "Pull cramping players immediately; hydrate"],
+		nonContact: true
+	},
+	{
+		id: "partner-mirror-shuffle",
+		name: "Partner Mirror Shuffle",
+		category: "agility",
+		intensity: "moderate",
+		durationMin: 8,
+		equipment: ["5×5 yard box marked by cones"],
+		positions: ["all"],
+		summary: "Reactive lateral conditioning — one leader, one mirror, no contact.",
+		objective: "Train reaction and lateral endurance.",
+		setup: ["Pairs inside a 5-yard box; 20-second bouts"],
+		steps: [
+			"Leader moves laterally / forward-back within the box",
+			"Mirror matches without touching",
+			"Switch roles every 20 seconds for 6–8 total bouts"
+		],
+		cues: [
+			"Athletic base the whole time",
+			"Leader changes direction every 1–2 seconds",
+			"Hands free — no pushing"
+		],
+		progressions: ["Shrink the box to 4×4 mid-camp"],
+		safety: ["Hard rule: zero contact if paths collide — reset"],
+		nonContact: true
+	},
+	{
+		id: "mobility-cooldown",
+		name: "Team Mobility Cool-down",
+		category: "cooldown",
+		intensity: "low",
+		durationMin: 8,
+		equipment: ["Optional bands / foam rollers"],
+		positions: ["all"],
+		summary: "Guided static and breath work to down-regulate after conditioning and protect soft tissue.",
+		objective: "Accelerate recovery between camp practices.",
+		setup: ["Players in a large circle or grid; coach leads"],
+		steps: [
+			"2 minutes easy walk + water",
+			"Half-kneeling hip flexor stretch 45s/side",
+			"Hamstring stretch 45s/side",
+			"Figure-4 glute stretch 45s/side",
+			"World's greatest stretch flow × 4/side",
+			"90 seconds nasal breathing, eyes closed"
+		],
+		cues: [
+			"Ease into stretch — no bouncing",
+			"Exhale longer than inhale on breath work",
+			"Check for hot spots; report early"
+		],
+		progressions: ["Add foam roll calves and quads when available"],
+		safety: ["Never force end range on cold or cramping athletes"],
+		nonContact: true
+	},
+	{
+		id: "core-finisher",
+		name: "Core Stability Finisher",
+		category: "strength",
+		intensity: "low",
+		durationMin: 6,
+		equipment: ["None"],
+		positions: ["all"],
+		summary: "Short anti-rotation and brace series that supports tackling posture later without contact today.",
+		objective: "Build trunk endurance for pad level and change of direction.",
+		setup: ["Players on grass with room to lie down"],
+		steps: [
+			"Front plank 30–40s",
+			"Side plank 20–30s/side",
+			"Dead bugs 8/side",
+			"Bird dogs 6/side",
+			"Rest 30s; optional second round"
+		],
+		cues: [
+			"Ribs down, glutes lightly on",
+			"Slow limbs on dead bugs — no lumbar arch",
+			"Quality holds beat long ugly planks"
+		],
+		progressions: ["Add 10 seconds to holds by day 7"],
+		safety: ["Modify side planks to knees if needed"],
+		nonContact: true
+	},
+	{
+		id: "ball-security-conditioning",
+		name: "Ball Security Gauntlet (Air)",
+		category: "position",
+		intensity: "moderate",
+		durationMin: 10,
+		equipment: [
+			"Footballs",
+			"Cones",
+			"Optional pool noodles for soft taps"
+		],
+		positions: ["skill", "big-skill"],
+		summary: "High-knee runs and weave with ball while coaches apply soft noodle taps — no tackling.",
+		objective: "Condition while automating four points of pressure.",
+		setup: ["10-yard lane; coaches with soft noodles only"],
+		steps: [
+			"High-knee march 10 yards securing ball",
+			"Weave cones with ball high and tight",
+			"Burst 10 yards; switch hands on jog return",
+			"Rotate 6–8 reps each player"
+		],
+		cues: [
+			"Elbow in, ball high on the rib",
+			"Eyes up on the burst",
+			"Noodles only — never wrap or grab"
+		],
+		progressions: ["Add a second ball exchange mid-rep for RBs"],
+		safety: ["Strict non-contact: soft taps only", "Remove any player who initiates contact"],
+		nonContact: true
+	}
+];
+function withDefaults(d) {
+	return {
+		...d,
+		contactLevel: d.contactLevel ?? (d.nonContact ? "air" : "thud"),
+		ageBands: d.ageBands ?? [
+			"youth",
+			"middle",
+			"high-school",
+			"college-adult"
+		]
+	};
+}
+var drills = [
+	...coreDrills,
+	...fundamentalDrills,
+	...toConeDrills()
+].map(withDefaults);
+function getDrillsForAge(age, contactCap) {
+	return drills.filter((d) => {
+		if (d.ageBands && !d.ageBands.includes(age)) return false;
+		if (contactCap && d.contactLevel) {
+			const rank = {
+				air: 0,
+				shells: 1,
+				thud: 2,
+				live: 3
+			};
+			if (rank[d.contactLevel] > rank[contactCap]) return false;
+		}
+		return true;
+	});
+}
+function getDrillById(id) {
+	return drills.find((d) => d.id === id);
+}
+//#endregion
+export { getDrillById as a, drills as i, INTENSITY_LABELS as n, getDrillsForAge as o, POSITION_LABELS as r, CATEGORY_LABELS as t };
