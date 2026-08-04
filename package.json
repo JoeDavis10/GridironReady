@@ -1,5 +1,5 @@
 {
-  "name": "app-builder-workspace",
+  "name": "gridiron-ready",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -8,13 +8,14 @@
   },
   "scripts": {
     "dev": "vite dev --host 0.0.0.0 --port 8080",
-    "build": "vite build && npm run db:migrate",
+    "build": "vite build",
     "db:migrate": "node scripts/migrate.mjs",
     "build:dev": "vite build --mode development",
     "preview": "vite preview --host 0.0.0.0 --port 8080",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "build:with-migrate": "vite build && npm run db:migrate"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.3",
