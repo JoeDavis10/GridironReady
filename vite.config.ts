@@ -129,6 +129,8 @@ export default defineConfig(({ command }) => ({
     host: "0.0.0.0",
     port: 8080,
     strictPort: true,
+    // Allow Cloudflare quick tunnels / mobile field testing hosts
+    allowedHosts: true,
   },
   resolve: { tsconfigPaths: true },
   plugins: [
