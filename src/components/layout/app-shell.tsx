@@ -33,7 +33,8 @@ export function AppShell({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (
-    <div className="mx-auto flex min-h-[calc(100dvh-var(--grok-banner-h,0px))] w-full max-w-lg flex-col bg-[var(--color-bg)]">
+    <div className="mx-auto flex min-h-[calc(100dvh-var(--grok-banner-h,0px))] w-full max-w-lg flex-col overflow-x-hidden bg-[var(--color-bg)]">
+
       {(title || action) && (
         <header className="sticky top-[var(--grok-banner-h,0px)] z-20 border-b border-[var(--color-border)] bg-[color-mix(in_oklab,var(--color-bg)_92%,transparent)] px-4 pb-3 pt-3 backdrop-blur-md">
           <div className="flex items-start justify-between gap-3">
@@ -56,8 +57,9 @@ export function AppShell({
 
       <main
         className={cn(
-          "flex-1 px-4 pt-4",
-          hideNav ? "pb-8" : "pb-[calc(5.5rem+env(safe-area-inset-bottom))]",
+          "min-w-0 flex-1 overflow-x-hidden px-4 pt-4",
+          hideNav ? "pb-[max(2.5rem,env(safe-area-inset-bottom))]" : "pb-[calc(5.5rem+env(safe-area-inset-bottom))]",
+
         )}
       >
         {children}

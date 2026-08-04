@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { drills } from "@/data/drills";
-import { plays } from "@/data/plays";
+import { getLadderPlays } from "@/data/plays";
 import {
   AGE_BAND_LABELS,
   CONTACT_LABELS,
@@ -62,7 +62,7 @@ function HomePage() {
     ].includes(d.id),
   );
 
-  const featuredPlays = plays.slice(0, 3);
+  const featuredPlays = getLadderPlays().slice(0, 3);
 
   return (
     <AppShell>
@@ -203,10 +203,10 @@ function HomePage() {
       <section className="mt-6 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold tracking-tight">
-            Play diagrams
+            OL training ladder
           </h2>
           <Link to="/plays" className="text-xs font-medium text-[var(--color-primary)]">
-            Full playbook
+            Full ladder
           </Link>
         </div>
         <div className="space-y-2">
@@ -219,14 +219,16 @@ function HomePage() {
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap gap-1.5">
+                  {play.ladderStep != null && (
+                    <Badge className="tabular-nums">Step {play.ladderStep}</Badge>
+                  )}
                   <Badge variant="outline">{play.shortName}</Badge>
-                  <Badge variant="secondary">{play.side}</Badge>
                 </div>
                 <p className="mt-1 font-display text-base font-semibold tracking-tight">
                   {play.name}
                 </p>
                 <p className="truncate text-xs text-[var(--color-subtle)]">
-                  {play.roles.length} roles · {play.formation}
+                  {play.ladderSkill ?? play.formation}
                 </p>
               </div>
               <ArrowRight className="size-4 shrink-0 text-[var(--color-subtle)]" />
