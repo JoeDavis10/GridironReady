@@ -1,5 +1,7 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
+import { SupabaseAuthProvider } from "@/lib/supabase-auth";
+import { RosterCloudSync } from "@/components/roster-sync";
 import { CreatedWithGrokBanner } from "@/components/created-with-grok-banner";
 import appCss from "../styles.css?url";
 
@@ -53,7 +55,10 @@ function RootDocument() {
       <body>
         <CreatedWithGrokBanner />
         <AuthProvider>
-          <Outlet />
+          <SupabaseAuthProvider>
+            <RosterCloudSync />
+            <Outlet />
+          </SupabaseAuthProvider>
         </AuthProvider>
         <Scripts />
       </body>

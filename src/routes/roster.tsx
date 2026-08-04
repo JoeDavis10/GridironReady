@@ -23,6 +23,8 @@ import {
   useRosterStore,
 } from "@/store/roster";
 import { cn } from "@/lib/utils";
+import { useSupabaseAuth } from "@/lib/supabase-auth";
+import { supabaseConfigured } from "@/lib/supabase";
 
 export const Route = createFileRoute("/roster")({
   component: RosterLayout,
@@ -43,6 +45,9 @@ function RosterPage() {
   const toggleCompare = useRosterStore((s) => s.toggleCompare);
   const seedDemoRoster = useRosterStore((s) => s.seedDemoRoster);
   const clearRoster = useRosterStore((s) => s.clearRoster);
+  const cloudStatus = useRosterStore((s) => s.cloudStatus);
+  const cloudError = useRosterStore((s) => s.cloudError);
+  const { user, signOut, isPending: authPending } = useSupabaseAuth();
 
   const [query, setQuery] = useState("");
   const [posFilter, setPosFilter] = useState<PositionId | "all">("all");
@@ -105,6 +110,36 @@ function RosterPage() {
           </Button>
         </div>
       </section>
+
+      {supabaseConfigured && (
+        <section className="mt-3 rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-elevated)] px-4 py-3">
+          {authPending || cloudStatus === "loading" ? (
+            <p className="text-xs text-[var(--color-muted)]">Syncing account…</p>
+          ) : user ? (
+            <div className="flex items-center justify-between gap-2">
+              <p className="min-w-0 truncate text-xs text-[var(--color-muted)]">
+                Cloud · {user.email ?? "signed in"}
+                {cloudStatus === "ready" ? " · synced" : ""}
+              </p>
+              <Button variant="ghost" size="sm" onClick={() => void signOut()}>
+                Sign out
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-[var(--color-muted)]">
+                Sign in to save roster across devices
+              </p>
+              <Button asChild size="sm">
+                <Link to="/login">Sign in</Link>
+              </Button>
+            </div>
+          )}
+          {cloudError && (
+            <p className="mt-1 text-xs text-[var(--color-warn)]">{cloudError}</p>
+          )}
+        </section>
+      )}
 
       {players.length === 0 ? (
         <div className="mt-8 rounded-[var(--radius-xl)] border border-dashed border-[var(--color-border)] px-4 py-10 text-center">

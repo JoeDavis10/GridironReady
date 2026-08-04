@@ -7,6 +7,15 @@ import {
   type Traits,
 } from "@/data/evaluation";
 import type { PositionId } from "@/data/positions";
+import {
+  clearRosterCloud,
+  deleteEvalCloud,
+  deletePlayerCloud,
+  fetchRosterCloud,
+  insertEvalCloud,
+  replaceRosterCloud,
+  upsertPlayerCloud,
+} from "@/lib/roster-api";
 
 export interface DrillEvalLog {
   id: string;
@@ -39,6 +48,11 @@ interface RosterState {
   players: Player[];
   evalLogs: DrillEvalLog[];
   compareIds: string[];
+  /** Supabase auth user id — when set, mutations write through to cloud */
+  cloudUserId: string | null;
+  cloudStatus: "idle" | "loading" | "ready" | "error";
+  cloudError: string | null;
+  setCloudUser: (userId: string | null) => Promise<void>;
   addPlayer: (input: Omit<Player, "id" | "createdAt" | "updatedAt" | "traits" | "measurables" | "targetPositions" | "notes"> & {
     traits?: Partial<Traits>;
     measurables?: Measurables;
@@ -63,6 +77,12 @@ function uid() {
 
 function now() {
   return new Date().toISOString();
+}
+
+function cloudCatch(err: unknown) {
+  const msg = err instanceof Error ? err.message : "Cloud sync failed";
+  console.error("[roster cloud]", err);
+  useRosterStore.setState({ cloudError: msg });
 }
 
 const DEMO: Array<
@@ -246,6 +266,34 @@ export const useRosterStore = create<RosterState>()(
       players: [],
       evalLogs: [],
       compareIds: [],
+      cloudUserId: null,
+      cloudStatus: "idle",
+      cloudError: null,
+
+      setCloudUser: async (userId) => {
+        if (!userId) {
+          set({
+            cloudUserId: null,
+            cloudStatus: "idle",
+            cloudError: null,
+            // keep local/demo data when signing out of cloud
+          });
+          return;
+        }
+        set({ cloudUserId: userId, cloudStatus: "loading", cloudError: null });
+        try {
+          const data = await fetchRosterCloud(userId);
+          set({
+            players: data.players,
+            evalLogs: data.evalLogs,
+            compareIds: [],
+            cloudStatus: "ready",
+          });
+        } catch (err) {
+          cloudCatch(err);
+          set({ cloudStatus: "error" });
+        }
+      },
 
       addPlayer: (input) => {
         const id = uid();
@@ -265,6 +313,10 @@ export const useRosterStore = create<RosterState>()(
           updatedAt: ts,
         };
         set({ players: [...get().players, player] });
+        const userId = get().cloudUserId;
+        if (userId) {
+          void upsertPlayerCloud(player, userId).catch(cloudCatch);
+        }
         return id;
       },
 
@@ -284,6 +336,11 @@ export const useRosterStore = create<RosterState>()(
               : p,
           ),
         });
+        const userId = get().cloudUserId;
+        const player = get().players.find((p) => p.id === id);
+        if (userId && player) {
+          void upsertPlayerCloud(player, userId).catch(cloudCatch);
+        }
       },
 
       removePlayer: (id) => {
@@ -292,6 +349,10 @@ export const useRosterStore = create<RosterState>()(
           evalLogs: get().evalLogs.filter((e) => e.playerId !== id),
           compareIds: get().compareIds.filter((x) => x !== id),
         });
+        const userId = get().cloudUserId;
+        if (userId) {
+          void deletePlayerCloud(id, userId).catch(cloudCatch);
+        }
       },
 
       setTrait: (id, trait, value) => {
@@ -307,6 +368,11 @@ export const useRosterStore = create<RosterState>()(
               : p,
           ),
         });
+        const userId = get().cloudUserId;
+        const player = get().players.find((p) => p.id === id);
+        if (userId && player) {
+          void upsertPlayerCloud(player, userId).catch(cloudCatch);
+        }
       },
 
       setMeasurable: (id, key, value) => {
@@ -324,6 +390,11 @@ export const useRosterStore = create<RosterState>()(
               : p,
           ),
         });
+        const userId = get().cloudUserId;
+        const player = get().players.find((p) => p.id === id);
+        if (userId && player) {
+          void upsertPlayerCloud(player, userId).catch(cloudCatch);
+        }
       },
 
       logEval: (playerId, drillId, score, note) => {
@@ -336,10 +407,18 @@ export const useRosterStore = create<RosterState>()(
           at: now(),
         };
         set({ evalLogs: [...get().evalLogs, entry] });
+        const userId = get().cloudUserId;
+        if (userId) {
+          void insertEvalCloud(entry, userId).catch(cloudCatch);
+        }
       },
 
       removeEval: (logId) => {
         set({ evalLogs: get().evalLogs.filter((e) => e.id !== logId) });
+        const userId = get().cloudUserId;
+        if (userId) {
+          void deleteEvalCloud(logId, userId).catch(cloudCatch);
+        }
       },
 
       toggleCompare: (playerId) => {
@@ -356,18 +435,37 @@ export const useRosterStore = create<RosterState>()(
 
       seedDemoRoster: () => {
         const ts = now();
-        const players: Player[] = DEMO.map((d, i) => ({
+        // Fresh ids every seed so multi-coach / multi-device never collide on PK
+        const players: Player[] = DEMO.map((d) => ({
           ...d,
-          id: `demo_${i}_${d.lastName.toLowerCase()}`,
+          id: uid(),
           createdAt: ts,
           updatedAt: ts,
         }));
         set({ players, evalLogs: [], compareIds: [] });
+        const userId = get().cloudUserId;
+        if (userId) {
+          void replaceRosterCloud(players, userId).catch(cloudCatch);
+        }
       },
 
-      clearRoster: () => set({ players: [], evalLogs: [], compareIds: [] }),
+      clearRoster: () => {
+        set({ players: [], evalLogs: [], compareIds: [] });
+        const userId = get().cloudUserId;
+        if (userId) {
+          void clearRosterCloud(userId).catch(cloudCatch);
+        }
+      },
     }),
-    { name: "gridiron-ready-roster" },
+    {
+      name: "gridiron-ready-roster",
+      // Don't persist cloud session fields — rehydrate from Supabase on login
+      partialize: (s) => ({
+        players: s.cloudUserId ? [] : s.players,
+        evalLogs: s.cloudUserId ? [] : s.evalLogs,
+        compareIds: s.compareIds,
+      }),
+    },
   ),
 );
 

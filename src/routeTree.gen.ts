@@ -13,11 +13,13 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConesRouteImport } from './routes/cones'
 import { Route as DrillsRouteImport } from './routes/drills'
 import { Route as GamesRouteImport } from './routes/games'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as PlansRouteImport } from './routes/plans'
 import { Route as PositionsRouteImport } from './routes/positions'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as RosterRouteImport } from './routes/roster'
 import { Route as SafetyRouteImport } from './routes/safety'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as DrillsIndexRouteImport } from './routes/drills.index'
 import { Route as DrillsDrillIdRouteImport } from './routes/drills.$drillId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
@@ -49,6 +51,11 @@ const GamesRoute = GamesRouteImport.update({
   path: '/games',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlansRoute = PlansRouteImport.update({
   id: '/plans',
   path: '/plans',
@@ -72,6 +79,11 @@ const RosterRoute = RosterRouteImport.update({
 const SafetyRoute = SafetyRouteImport.update({
   id: '/safety',
   path: '/safety',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DrillsIndexRoute = DrillsIndexRouteImport.update({
@@ -130,11 +142,13 @@ export interface FileRoutesByFullPath {
   '/cones': typeof ConesRoute
   '/drills': typeof DrillsRouteWithChildren
   '/games': typeof GamesRouteWithChildren
+  '/login': typeof LoginRoute
   '/plans': typeof PlansRouteWithChildren
   '/positions': typeof PositionsRouteWithChildren
   '/progress': typeof ProgressRoute
   '/roster': typeof RosterRouteWithChildren
   '/safety': typeof SafetyRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/drills/$drillId': typeof DrillsDrillIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/plans/$planId': typeof PlansPlanIdRoute
@@ -150,10 +164,12 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/cones': typeof ConesRoute
   '/games': typeof GamesRouteWithChildren
+  '/login': typeof LoginRoute
   '/positions': typeof PositionsRouteWithChildren
   '/progress': typeof ProgressRoute
   '/roster': typeof RosterRouteWithChildren
   '/safety': typeof SafetyRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/drills/$drillId': typeof DrillsDrillIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/plans/$planId': typeof PlansPlanIdRoute
@@ -171,11 +187,13 @@ export interface FileRoutesById {
   '/cones': typeof ConesRoute
   '/drills': typeof DrillsRouteWithChildren
   '/games': typeof GamesRouteWithChildren
+  '/login': typeof LoginRoute
   '/plans': typeof PlansRouteWithChildren
   '/positions': typeof PositionsRouteWithChildren
   '/progress': typeof ProgressRoute
   '/roster': typeof RosterRouteWithChildren
   '/safety': typeof SafetyRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/drills/$drillId': typeof DrillsDrillIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/plans/$planId': typeof PlansPlanIdRoute
@@ -194,11 +212,13 @@ export interface FileRouteTypes {
     | '/cones'
     | '/drills'
     | '/games'
+    | '/login'
     | '/plans'
     | '/positions'
     | '/progress'
     | '/roster'
     | '/safety'
+    | '/auth/callback'
     | '/drills/$drillId'
     | '/games/$gameId'
     | '/plans/$planId'
@@ -214,10 +234,12 @@ export interface FileRouteTypes {
     | '/'
     | '/cones'
     | '/games'
+    | '/login'
     | '/positions'
     | '/progress'
     | '/roster'
     | '/safety'
+    | '/auth/callback'
     | '/drills/$drillId'
     | '/games/$gameId'
     | '/plans/$planId'
@@ -234,11 +256,13 @@ export interface FileRouteTypes {
     | '/cones'
     | '/drills'
     | '/games'
+    | '/login'
     | '/plans'
     | '/positions'
     | '/progress'
     | '/roster'
     | '/safety'
+    | '/auth/callback'
     | '/drills/$drillId'
     | '/games/$gameId'
     | '/plans/$planId'
@@ -256,11 +280,13 @@ export interface RootRouteChildren {
   ConesRoute: typeof ConesRoute
   DrillsRoute: typeof DrillsRouteWithChildren
   GamesRoute: typeof GamesRouteWithChildren
+  LoginRoute: typeof LoginRoute
   PlansRoute: typeof PlansRouteWithChildren
   PositionsRoute: typeof PositionsRouteWithChildren
   ProgressRoute: typeof ProgressRoute
   RosterRoute: typeof RosterRouteWithChildren
   SafetyRoute: typeof SafetyRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
   SessionPlanIdRoute: typeof SessionPlanIdRoute
 }
 
@@ -292,6 +318,13 @@ declare module '@tanstack/react-router' {
       path: '/games'
       fullPath: '/games'
       preLoaderRoute: typeof GamesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/plans': {
@@ -327,6 +360,13 @@ declare module '@tanstack/react-router' {
       path: '/safety'
       fullPath: '/safety'
       preLoaderRoute: typeof SafetyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/drills/': {
@@ -469,11 +509,13 @@ const rootRouteChildren: RootRouteChildren = {
   ConesRoute: ConesRoute,
   DrillsRoute: DrillsRouteWithChildren,
   GamesRoute: GamesRouteWithChildren,
+  LoginRoute: LoginRoute,
   PlansRoute: PlansRouteWithChildren,
   PositionsRoute: PositionsRouteWithChildren,
   ProgressRoute: ProgressRoute,
   RosterRoute: RosterRouteWithChildren,
   SafetyRoute: SafetyRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
   SessionPlanIdRoute: SessionPlanIdRoute,
 }
 export const routeTree = rootRouteImport
