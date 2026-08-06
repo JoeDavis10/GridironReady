@@ -19,12 +19,30 @@ import {
   type Play,
   type PlayRole,
 } from "@/data/plays";
+import {
+  DEF_FRONTS,
+  buildSimPlay,
+  type DefFrontId,
+} from "@/data/play-looks";
 import { sampleBlockPhysics } from "@/lib/block-physics";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const SPEEDS = [0.75, 1, 1.5, 2] as const;
+
+function schemeCapable(playId: string): boolean {
+  return [
+    "dive",
+    "iso",
+    "inside-zone",
+    "power",
+    "reach",
+    "outside-zone",
+    "counter-simple",
+    "counter",
+  ].includes(playId);
+}
 
 /** Distinct OL colors — pullers stay high-contrast */
 const ROLE_HUES = [
@@ -235,6 +253,9 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
   const [showLook, setShowLook] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [immersive, setImmersive] = useState(false);
+  const [frontId, setFrontId] = useState<DefFrontId>("43-over");
+  /** generic = install path lines; assignment = GOD paths vs selected front */
+  const [olMode, setOlMode] = useState<"generic" | "assignment">("assignment");
   const shellRef = useRef<HTMLDivElement>(null);
 
   const rafRef = useRef<number | null>(null);
@@ -244,10 +265,18 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
   const playingRef = useRef(false);
   const speedRef = useRef(1);
 
-  const phase = play.phases[phaseIndex] ?? play.phases[0]!;
+  const simPlay = useMemo(
+    () =>
+      play.side === "offense"
+        ? buildSimPlay(play, frontId, olMode)
+        : play,
+    [play, frontId, olMode],
+  );
+  const phase = simPlay.phases[phaseIndex] ?? simPlay.phases[0]!;
   const speed = SPEEDS[speedIdx]!;
-  const look = play.look ?? [];
-  const hasLook = look.length > 0 && play.side === "offense";
+  const look = simPlay.look ?? [];
+  const hasLook = look.length > 0 && simPlay.side === "offense";
+  const canSwitchFront = play.side === "offense" && Boolean(schemeCapable(play.id));
 
   useEffect(() => {
     phaseRef.current = phaseIndex;
@@ -278,11 +307,24 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
     setFocusLookId(null);
     setShowLook(true);
     setImmersive(false);
+    setOlMode("assignment");
+    // keep frontId across plays so coach can compare same front
     phaseRef.current = 0;
     progressRef.current = 0;
     playingRef.current = false;
     lastTs.current = null;
   }, [play.id]);
+
+  useEffect(() => {
+    // Front / OL mode change: restart so assignment paths read cleanly
+    setPhaseIndex(0);
+    setProgress(0);
+    setPlaying(false);
+    phaseRef.current = 0;
+    progressRef.current = 0;
+    playingRef.current = false;
+    lastTs.current = null;
+  }, [frontId, olMode]);
 
   useEffect(() => {
     if (!immersive) return;
@@ -308,7 +350,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
 
   const goToPhase = useCallback(
     (index: number) => {
-      const next = Math.max(0, Math.min(play.phases.length - 1, index));
+      const next = Math.max(0, Math.min(simPlay.phases.length - 1, index));
       phaseRef.current = next;
       progressRef.current = 0;
       lastTs.current = null;
@@ -317,7 +359,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
       playingRef.current = false;
       setPlaying(false);
     },
-    [play.phases.length],
+    [simPlay.phases.length],
   );
 
   useEffect(() => {
@@ -335,11 +377,11 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
       lastTs.current = ts;
 
       const pIdx = phaseRef.current;
-      const ph = play.phases[pIdx]!;
+      const ph = simPlay.phases[pIdx]!;
       const next = progressRef.current + dt / ph.durationMs;
 
       if (next >= 1) {
-        if (pIdx >= play.phases.length - 1) {
+        if (pIdx >= simPlay.phases.length - 1) {
           progressRef.current = 1;
           setProgress(1);
           playingRef.current = false;
@@ -364,24 +406,24 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
     return () => {
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
-  }, [playing, reducedMotion, play.phases]);
+  }, [playing, reducedMotion, simPlay.phases]);
 
   const roleStates = useMemo(() => {
     const t = easeInOut(progress);
-    return play.roles.map((role, i) => {
-      const start = roleProgressAtPhaseStart(play, phaseIndex, role.id);
-      const end = roleProgressAtPhaseEnd(play, phaseIndex, role.id);
+    return simPlay.roles.map((role, i) => {
+      const start = roleProgressAtPhaseStart(simPlay, phaseIndex, role.id);
+      const end = roleProgressAtPhaseEnd(simPlay, phaseIndex, role.id);
       const along = start + (end - start) * t;
       const pos = pointAlongPath(role.path, along);
       const pull = isPuller(role);
       return { role, i, along, pos, trail: role.path, pull };
     });
-  }, [play, phaseIndex, progress]);
+  }, [simPlay, phaseIndex, progress]);
 
   const physics = useMemo(() => {
     if (!hasLook || !showLook) return null;
-    return sampleBlockPhysics(play, phaseIndex, progress);
-  }, [play, phaseIndex, progress, hasLook, showLook]);
+    return sampleBlockPhysics(simPlay, phaseIndex, progress);
+  }, [simPlay, phaseIndex, progress, hasLook, showLook]);
 
   const lookStates = useMemo(() => {
     if (!physics) return [];
@@ -476,9 +518,9 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
 
   const focused: PlayRole | undefined =
     focusRoleId != null
-      ? play.roles.find((r) => r.id === focusRoleId)
-      : (play.roles.find((r) => r.highlightPhases?.includes(phaseIndex)) ??
-        play.roles[0]);
+      ? simPlay.roles.find((r) => r.id === focusRoleId)
+      : (simPlay.roles.find((r) => r.highlightPhases?.includes(phaseIndex)) ??
+        simPlay.roles[0]);
 
   const focusedLook: LookDefender | undefined =
     focusLookId != null ? look.find((d) => d.id === focusLookId) : undefined;
@@ -524,15 +566,16 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
               {play.formation}
               {immersive ? ` · ${play.name}` : ""}
             </p>
-            {hasLook && play.lookFront && (
+            {hasLook && simPlay.lookFront && (
               <p className="truncate text-[10px] text-[var(--color-muted)]">
-                vs {play.lookFront} · reactive D
+                vs {simPlay.lookFront}
+                {olMode === "assignment" ? " · assignment" : " · generic"}
               </p>
             )}
           </div>
           <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
             <p className="text-[11px] font-semibold tabular-nums text-[var(--color-muted)]">
-              {play.roles.length}
+              {simPlay.roles.length}
               {hasLook && showLook ? ` + ${look.length} D` : ""} players
             </p>
             {hasLook && (
@@ -593,7 +636,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
             textRendering: "geometricPrecision",
           }}
           role="img"
-          aria-label={`${play.name} play diagram`}
+          aria-label={`${simPlay.name} play diagram · ${simPlay.lookFront ?? ""}`}
         >
           <defs>
             {ROLE_HUES.map((hue, i) => (
@@ -907,12 +950,110 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
           </div>
         )}
 
-      {hasLook && play.lookNote && showLook && !immersive && (
+      {canSwitchFront && !immersive && (
+        <div className="w-full max-w-full min-w-0 space-y-3">
+          <div className="flex w-full min-w-0 flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setOlMode("generic")}
+              className={cn(
+                "h-10 min-w-0 flex-1 rounded-[var(--radius-md)] border px-3 text-xs font-semibold touch-manipulation",
+                olMode === "generic"
+                  ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
+                  : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]",
+              )}
+            >
+              Generic paths
+            </button>
+            <button
+              type="button"
+              onClick={() => setOlMode("assignment")}
+              className={cn(
+                "h-10 min-w-0 flex-1 rounded-[var(--radius-md)] border px-3 text-xs font-semibold touch-manipulation",
+                olMode === "assignment"
+                  ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
+                  : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]",
+              )}
+            >
+              Blocking assignment
+            </button>
+          </div>
+          <div className="w-full max-w-full min-w-0">
+            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--color-subtle)]">
+              Defensive front
+            </p>
+            <div className="flex w-full min-w-0 gap-2 overflow-x-auto overscroll-x-contain touch-pan-x pb-1 [scrollbar-width:thin]">
+              {DEF_FRONTS.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => {
+                    setFrontId(f.id);
+                    setFocusLookId(null);
+                    goToPhase(0);
+                  }}
+                  className={cn(
+                    "h-10 shrink-0 snap-start rounded-full border px-3.5 text-xs font-semibold touch-manipulation",
+                    frontId === f.id
+                      ? "border-transparent bg-[var(--color-fg)] text-[var(--color-bg)]"
+                      : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]",
+                  )}
+                  title={f.blurb}
+                >
+                  {f.short}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--color-subtle)]">
+              {DEF_FRONTS.find((f) => f.id === frontId)?.blurb}
+              {olMode === "assignment"
+                ? " · OL tracks recompute to this front."
+                : " · Showing install movement lines."}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {canSwitchFront && immersive && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
+          <button
+            type="button"
+            onClick={() =>
+              setOlMode((m) => (m === "generic" ? "assignment" : "generic"))
+            }
+            className="h-9 shrink-0 rounded-full border border-[var(--color-border-strong)] bg-[var(--color-elevated)] px-3 text-[10px] font-semibold"
+          >
+            {olMode === "assignment" ? "Assign on" : "Generic"}
+          </button>
+          <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto overscroll-x-contain touch-pan-x">
+            {DEF_FRONTS.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => {
+                  setFrontId(f.id);
+                  goToPhase(0);
+                }}
+                className={cn(
+                  "h-8 shrink-0 rounded-full border px-2.5 text-[10px] font-semibold",
+                  frontId === f.id
+                    ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
+                    : "border-[var(--color-border)] text-[var(--color-muted)]",
+                )}
+              >
+                {f.short}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hasLook && simPlay.lookNote && showLook && !immersive && (
         <p className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs leading-relaxed text-[var(--color-muted)]">
           <span className="font-semibold text-[var(--color-fg)]">
-            Reactive D · GOD:{" "}
+            {olMode === "assignment" ? "GOD assignment · " : "Reactive D · "}
           </span>
-          {play.lookNote}
+          {simPlay.lookNote}
         </p>
       )}
 
@@ -950,7 +1091,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
               goToPhase(phaseIndex >= play.phases.length - 1 ? 0 : phaseIndex + 1);
               return;
             }
-            if (progress >= 1 && phaseIndex >= play.phases.length - 1) {
+            if (progress >= 1 && phaseIndex >= simPlay.phases.length - 1) {
               goToPhase(0);
               setPlaying(true);
               playingRef.current = true;
@@ -968,7 +1109,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
           variant="secondary"
           className="min-h-10 min-w-10 shrink-0"
           onClick={() => goToPhase(phaseIndex + 1)}
-          disabled={phaseIndex >= play.phases.length - 1}
+          disabled={phaseIndex >= simPlay.phases.length - 1}
           aria-label="Next phase"
         >
           <SkipForward className="size-4" />
@@ -985,7 +1126,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
       </div>
 
       <div className="flex w-full min-w-0 gap-1.5">
-        {play.phases.map((ph, i) => (
+        {simPlay.phases.map((ph, i) => (
           <button
             key={ph.id}
             type="button"
@@ -1028,8 +1169,8 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
 
       {!immersive && (
       <section className="w-full max-w-full min-w-0">
-        <ChipRail label={`Offense (${play.roles.length}) — swipe or tap arrows`}>
-          {play.roles.map((role, i) => {
+        <ChipRail label={`Offense (${simPlay.roles.length}) — swipe or tap arrows`}>
+          {simPlay.roles.map((role, i) => {
             const pull = isPuller(role);
             return (
               <button
@@ -1074,7 +1215,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
           <RoleCard
             role={focused}
             color={roleColor(
-              Math.max(0, play.roles.findIndex((r) => r.id === focused.id)),
+              Math.max(0, simPlay.roles.findIndex((r) => r.id === focused.id)),
             )}
             pull={isPuller(focused)}
           />

@@ -1,31 +1,110 @@
-import type { FieldPoint, Play, PlayPhase } from "./plays";
+import type { FieldPoint, Play, PlayPhase, PlayRole } from "./plays";
 
 /**
- * Simulated defensive "look" on offensive diagrams — contact points,
- * double-team targets, and GOD (Gap On Down) engagement cues.
+ * Simulated defensive looks + GOD blocking assignment detector.
+ * Fronts are switchable; assignments recompute against the active front.
  */
+
 export interface LookDefender {
   id: string;
   tag: string;
   label: string;
   path: FieldPoint[];
-  /**
-   * Offensive role ids that engage this defender under GOD / scheme rules.
-   * Two+ ids = double-team / combo.
-   */
+  /** Offensive role ids that engage this defender (2+ = double / combo). */
   engagedBy: string[];
-  /** Emphasize as a double-team / combo landmark */
   doubleTeam?: boolean;
   job: string;
 }
 
 export interface PlayLook {
-  /** Front label shown on the diagram */
   front: string;
+  frontId: DefFrontId;
   note: string;
   defenders: LookDefender[];
-  /** Per-phase end progress 0–1 keyed by defender id (aligned to play.phases order) */
   phaseProgress: Record<string, number>[];
+}
+
+export type DefFrontId =
+  | "43-over"
+  | "43-under"
+  | "52"
+  | "34"
+  | "bear"
+  | "33-stack";
+
+export interface DefFrontMeta {
+  id: DefFrontId;
+  label: string;
+  short: string;
+  blurb: string;
+}
+
+export const DEF_FRONTS: DefFrontMeta[] = [
+  {
+    id: "43-over",
+    label: "4-3 Over",
+    short: "4-3 O",
+    blurb: "Even front, shade strong — base install.",
+  },
+  {
+    id: "43-under",
+    label: "4-3 Under",
+    short: "4-3 U",
+    blurb: "Even front, shade weak — flips the 3-tech.",
+  },
+  {
+    id: "52",
+    label: "5-2 Eagle",
+    short: "5-2",
+    blurb: "Odd/even hybrid — five down, two LBs.",
+  },
+  {
+    id: "34",
+    label: "3-4 Odd",
+    short: "3-4",
+    blurb: "Odd front — nose + two ends, four LBs.",
+  },
+  {
+    id: "bear",
+    label: "Bear / Goal",
+    short: "Bear",
+    blurb: "Tight six-man surface — short yardage.",
+  },
+  {
+    id: "33-stack",
+    label: "3-3 Stack",
+    short: "3-3",
+    blurb: "Light box, stacked LBs — space + scrapes.",
+  },
+];
+
+export type SchemeId =
+  | "dive"
+  | "iso"
+  | "inside-zone"
+  | "power"
+  | "reach"
+  | "outside-zone"
+  | "counter-simple"
+  | "counter";
+
+function schemeOf(playId: string): SchemeId | null {
+  const known: SchemeId[] = [
+    "dive",
+    "iso",
+    "inside-zone",
+    "power",
+    "reach",
+    "outside-zone",
+    "counter-simple",
+    "counter",
+  ];
+  return (known as string[]).includes(playId) ? (playId as SchemeId) : null;
+}
+
+function playsideOf(scheme: SchemeId): "L" | "R" {
+  if (scheme === "counter" || scheme === "counter-simple") return "L";
+  return "R";
 }
 
 function d(
@@ -33,178 +112,361 @@ function d(
   tag: string,
   label: string,
   path: FieldPoint[],
+  job = "Alignment",
+): LookDefender {
+  return { id, tag, label, path, engagedBy: [], job };
+}
+
+/** Build raw front alignments (no assignments yet). */
+export function buildFrontAlignments(frontId: DefFrontId): LookDefender[] {
+  // Secondary stays fairly constant; front varies.
+  const fs = d("look-fs", "FS", "Free safety", [[50, 34], [50, 32], [50, 30]], "Deep middle");
+  const ss = d("look-ss", "SS", "Strong safety", [[64, 38], [65, 36], [66, 34]], "Box / alley");
+  const cbL = d("look-cb-l", "CB", "LCB", [[16, 48], [15, 46], [14, 44]], "Boundary corner");
+  const cbR = d("look-cb-r", "CB", "RCB", [[84, 48], [85, 46], [86, 44]], "Field corner");
+
+  if (frontId === "43-over") {
+    return [
+      d("look-de-l", "E", "LE", [[34, 49], [33, 48], [32, 46]], "Weak end"),
+      d("look-dt-l", "N", "1-tech / shade", [[46, 49], [46, 47], [45, 45]], "A-gap shade"),
+      d("look-dt-r", "T", "3-tech", [[56, 49], [57, 47], [58, 45]], "Strong 3-tech"),
+      d("look-de-r", "E", "RE", [[66, 49], [67, 48], [68, 46]], "Strong end"),
+      d("look-will", "W", "Will", [[38, 45], [37, 43], [36, 41]], "Weak LB"),
+      d("look-mike", "M", "Mike", [[50, 45], [50, 43], [51, 41]], "Mike"),
+      d("look-sam", "S", "Sam", [[62, 45], [63, 43], [64, 41]], "Sam"),
+      fs, ss, cbL, cbR,
+    ];
+  }
+
+  if (frontId === "43-under") {
+    // Shade weak: 3-tech to offense left, 1-tech strong
+    return [
+      d("look-de-l", "E", "LE", [[34, 49], [33, 48], [32, 46]], "Weak end"),
+      d("look-dt-l", "T", "3-tech (weak)", [[42, 49], [41, 47], [40, 45]], "Weak 3-tech"),
+      d("look-dt-r", "N", "1-tech / shade", [[54, 49], [54, 47], [55, 45]], "Strong shade"),
+      d("look-de-r", "E", "RE", [[66, 49], [67, 48], [68, 46]], "Strong end"),
+      d("look-will", "W", "Will", [[36, 45], [35, 43], [34, 41]], "Will"),
+      d("look-mike", "M", "Mike", [[50, 45], [50, 43], [49, 41]], "Mike"),
+      d("look-sam", "S", "Sam", [[64, 45], [65, 43], [66, 41]], "Sam"),
+      fs, ss, cbL, cbR,
+    ];
+  }
+
+  if (frontId === "52") {
+    return [
+      d("look-de-l", "E", "LE", [[30, 49], [29, 48], [28, 46]], "Wide end"),
+      d("look-dt-l", "T", "DT", [[42, 49], [42, 47], [41, 45]], "Down tackle"),
+      d("look-dt-r", "N", "Nose", [[50, 49], [50, 47], [50, 45]], "0-tech nose"),
+      d("look-de-r", "T", "DT", [[58, 49], [58, 47], [59, 45]], "Down tackle"),
+      d("look-edge-r", "E", "RE", [[70, 49], [71, 48], [72, 46]], "Wide end"),
+      d("look-will", "W", "ILB", [[42, 44], [41, 42], [40, 40]], "ILB weak"),
+      d("look-mike", "M", "ILB", [[58, 44], [59, 42], [60, 40]], "ILB strong"),
+      d("look-sam", "S", "OLB", [[74, 46], [75, 44], [76, 42]], "Force OLB"),
+      fs, ss, cbL, cbR,
+    ];
+  }
+
+  if (frontId === "34") {
+    return [
+      d("look-de-l", "E", "LE", [[38, 49], [37, 48], [36, 46]], "5-tech end"),
+      d("look-dt-l", "N", "Nose", [[50, 49], [50, 47], [50, 45]], "0-tech nose"),
+      d("look-de-r", "E", "RE", [[62, 49], [63, 48], [64, 46]], "5-tech end"),
+      d("look-will", "W", "Will", [[34, 45], [33, 43], [32, 41]], "OLB weak"),
+      d("look-mike", "M", "Mike", [[46, 44], [46, 42], [45, 40]], "ILB"),
+      d("look-mike-r", "M", "Mo", [[54, 44], [54, 42], [55, 40]], "ILB"),
+      d("look-sam", "S", "Sam", [[66, 45], [67, 43], [68, 41]], "OLB strong"),
+      fs, ss, cbL, cbR,
+    ];
+  }
+
+  if (frontId === "bear") {
+    return [
+      d("look-de-l", "E", "LE", [[36, 49], [35, 48], [34, 47]], "Tight end"),
+      d("look-dt-l", "T", "DT", [[44, 49], [44, 48], [43, 46]], "3-tech"),
+      d("look-dt-r", "N", "Nose", [[50, 49], [50, 48], [50, 46]], "0-tech"),
+      d("look-de-r", "T", "DT", [[56, 49], [56, 48], [57, 46]], "3-tech"),
+      d("look-edge-r", "E", "RE", [[64, 49], [65, 48], [66, 47]], "Tight end"),
+      d("look-will", "W", "LB", [[40, 44], [39, 43], [38, 41]], "LB"),
+      d("look-mike", "M", "LB", [[50, 44], [50, 43], [50, 41]], "LB"),
+      d("look-sam", "S", "LB", [[60, 44], [61, 43], [62, 41]], "LB"),
+      fs,
+      d("look-ss", "SS", "SS", [[60, 36], [61, 34], [62, 32]], "Alley"),
+      cbL, cbR,
+    ];
+  }
+
+  // 3-3 stack
+  return [
+    d("look-de-l", "E", "LE", [[36, 49], [35, 48], [34, 46]], "End"),
+    d("look-dt-l", "N", "Nose", [[50, 49], [50, 47], [50, 45]], "Nose"),
+    d("look-de-r", "E", "RE", [[64, 49], [65, 48], [66, 46]], "End"),
+    d("look-will", "W", "Stack W", [[36, 44], [35, 42], [34, 40]], "Stacked"),
+    d("look-mike", "M", "Stack M", [[50, 44], [50, 42], [50, 40]], "Stacked"),
+    d("look-sam", "S", "Stack S", [[64, 44], [65, 42], [66, 40]], "Stacked"),
+    d("look-ss", "SS", "Apex", [[70, 40], [71, 38], [72, 36]], "Apex / force"),
+    fs, cbL, cbR,
+    d("look-cb-slot", "N", "Slot", [[72, 48], [73, 46], [74, 44]], "Slot / edge"),
+  ];
+}
+
+function cloneDefs(defs: LookDefender[]): LookDefender[] {
+  return defs.map((x) => ({
+    ...x,
+    path: x.path.map((p) => [p[0], p[1]] as FieldPoint),
+    engagedBy: [...x.engagedBy],
+  }));
+}
+
+function setEng(
+  defs: LookDefender[],
+  id: string,
   engagedBy: string[],
   job: string,
   doubleTeam?: boolean,
-): LookDefender {
-  return { id, tag, label, path, engagedBy, job, doubleTeam };
+) {
+  const x = defs.find((d) => d.id === id);
+  if (!x) return;
+  x.engagedBy = engagedBy;
+  x.job = job;
+  if (doubleTeam !== undefined) x.doubleTeam = doubleTeam;
+  else x.doubleTeam = engagedBy.length >= 2;
 }
 
-/** Even 4-3 over: shade strong (right) — common youth/high-school install front. */
-function front43Over(opts: {
-  /** playside for run (right = power/oz default) */
-  playside?: "L" | "R";
-  /** who doubles the down man (combo) */
-  combo?: [string, string];
-  comboTarget?: "N" | "T" | "E";
-  /** FB/H iso target LB */
-  isoLb?: "M" | "W" | "S";
-  /** puller leave creates free runner risk */
-  hingeVs?: string;
-}): PlayLook["defenders"] {
-  const ps = opts.playside ?? "R";
-  // Alignments: DL on LOS just defense side of 50
-  const deL = d(
-    "look-de-l",
-    "E",
-    "LE",
-    [
-      [34, 49],
-      [33, 48],
-      [32, 46],
-    ],
-    ps === "L" ? ["lt", "y"] : ["lt"],
-    "Edge — base/hinge or reach depending on call.",
-  );
-  const dtL = d(
-    "look-dt-l",
-    "N",
-    "Nose / shade",
-    [
-      [46, 49],
-      [46, 47],
-      [45, 45],
-    ],
-    opts.comboTarget === "N" && opts.combo
-      ? opts.combo
-      : ["lg", "c"],
-    "A/B shade — GOD gap + down rules.",
-    opts.comboTarget === "N",
-  );
-  const dtR = d(
-    "look-dt-r",
-    "T",
-    "3-tech",
-    [
-      [56, 49],
-      [57, 47],
-      [58, 45],
-    ],
-    opts.comboTarget === "T" && opts.combo
-      ? opts.combo
-      : ["rg", "c"],
-    "3-tech — base, down, or combo post.",
-    opts.comboTarget === "T",
-  );
-  const deR = d(
-    "look-de-r",
-    "E",
-    "RE",
-    [
-      [66, 49],
-      [67, 48],
-      [68, 46],
-    ],
-    ps === "R" ? ["rt", "y"] : ["rt"],
-    "Edge EMOL — reach/seal or base.",
-    opts.comboTarget === "E",
-  );
+function dlIds(defs: LookDefender[]): string[] {
+  return defs
+    .filter((d) => {
+      const t = d.tag.toUpperCase();
+      return t === "E" || t === "T" || t === "N";
+    })
+    .sort((a, b) => a.path[0]![0] - b.path[0]![0])
+    .map((d) => d.id);
+}
 
-  const will = d(
-    "look-will",
-    "W",
-    "Will",
-    [
-      [38, 45],
-      [37, 43],
-      [36, 41],
-    ],
-    opts.isoLb === "W" ? ["fb"] : ps === "L" ? ["lg", "lt"] : ["lt"],
-    "Flow LB — climb / iso / scrape.",
-    opts.isoLb === "W",
-  );
-  const mike = d(
-    "look-mike",
-    "M",
-    "Mike",
-    [
-      [50, 45],
-      [50, 43],
-      [51, 41],
-    ],
-    opts.isoLb === "M"
-      ? ["fb"]
-      : opts.combo
-        ? [opts.combo[1]!] // climber often peels here
-        : ["c", "lg"],
-    "Mike — combo peel, iso, or flow.",
-    opts.isoLb === "M" || Boolean(opts.combo),
-  );
-  const sam = d(
-    "look-sam",
-    "S",
-    "Sam",
-    [
-      [62, 45],
-      [63, 43],
-      [64, 41],
-    ],
-    opts.isoLb === "S" ? ["fb"] : ps === "R" ? ["rg", "rt"] : ["rt"],
-    "Sam — force / scrape / kick target.",
-    opts.isoLb === "S",
-  );
+function lbIds(defs: LookDefender[]): string[] {
+  return defs
+    .filter((d) => {
+      const t = d.tag.toUpperCase();
+      return t === "M" || t === "W" || t === "S";
+    })
+    .sort((a, b) => a.path[0]![0] - b.path[0]![0])
+    .map((d) => d.id);
+}
 
-  const fs = d(
-    "look-fs",
-    "FS",
-    "Free safety",
-    [
-      [50, 34],
-      [50, 32],
-      [50, 30],
-    ],
-    [],
-    "Deep middle — late alley / cutback.",
-  );
-  const ss = d(
-    "look-ss",
-    "SS",
-    "Strong safety",
-    [
-      [64, 38],
-      [65, 36],
-      [66, 34],
-    ],
-    ps === "R" ? ["y", "z"] : ["y"],
-    "Box/alley — force or fold.",
-  );
-  const cbL = d(
-    "look-cb-l",
-    "CB",
-    "LCB",
-    [
-      [16, 48],
-      [15, 46],
-      [14, 44],
-    ],
-    ["x"],
-    "Boundary corner — stalk block target.",
-  );
-  const cbR = d(
-    "look-cb-r",
-    "CB",
-    "RCB",
-    [
-      [84, 48],
-      [85, 46],
-      [86, 44],
-    ],
-    ["z"],
-    "Field corner — stalk / force.",
-  );
+function nearestToX(defs: LookDefender[], ids: string[], x: number): string | null {
+  let best: string | null = null;
+  let bestD = Infinity;
+  for (const id of ids) {
+    const def = defs.find((d) => d.id === id);
+    if (!def) continue;
+    const dx = Math.abs(def.path[0]![0] - x);
+    if (dx < bestD) {
+      bestD = dx;
+      best = id;
+    }
+  }
+  return best;
+}
 
-  // Slight motion if play goes left — swap shade emphasis already via engagements
-  return [deL, dtL, dtR, deR, will, mike, sam, fs, ss, cbL, cbR];
+/** OL slot x anchors (I-form center = 50) */
+const OL_X: Record<string, number> = {
+  lt: 38,
+  lg: 44,
+  c: 50,
+  rg: 56,
+  rt: 62,
+  y: 68,
+  te: 68,
+  fb: 50,
+  h: 46,
+  rb: 50,
+  x: 16,
+  z: 84,
+};
+
+/**
+ * GOD + scheme assignment detector.
+ * Maps each defender to OL engagers based on front geometry + play scheme.
+ */
+export function assignBlocking(
+  raw: LookDefender[],
+  scheme: SchemeId,
+): LookDefender[] {
+  const defs = cloneDefs(raw);
+  const ps = playsideOf(scheme);
+  const dls = dlIds(defs);
+  const lbs = lbIds(defs);
+
+  // Map OL to nearest DL by gap (base GOD)
+  const olSlots = ["lt", "lg", "c", "rg", "rt"] as const;
+  const covered = new Map<string, string>(); // ol -> dl
+  const dlCover = new Map<string, string[]>(); // dl -> ols
+
+  for (const ol of olSlots) {
+    const dl = nearestToX(defs, dls, OL_X[ol]!);
+    if (!dl) continue;
+    covered.set(ol, dl);
+    const list = dlCover.get(dl) ?? [];
+    list.push(ol);
+    dlCover.set(dl, list);
+  }
+
+  // Clear and apply base 1-on-1 GOD
+  for (const def of defs) {
+    def.engagedBy = [];
+    def.doubleTeam = false;
+  }
+
+  for (const [dl, ols] of dlCover) {
+    if (ols.length === 1) {
+      setEng(defs, dl, [ols[0]!], "GOD base — man in front.", false);
+    } else if (ols.length >= 2) {
+      // Uncovered rule / shared — double possible
+      setEng(defs, dl, ols.slice(0, 2), "GOD shared surface — combo candidate.", true);
+    }
+  }
+
+  // Edge DE vs RT/LT/Y
+  const leftmost = dls[0];
+  const rightmost = dls[dls.length - 1];
+  if (leftmost && !dlCover.has(leftmost)) {
+    setEng(defs, leftmost, ["lt"], "Edge — base / hinge / reach.", false);
+  }
+  if (rightmost && !dlCover.has(rightmost)) {
+    setEng(defs, rightmost, ps === "R" ? ["rt", "y"] : ["rt"], "Edge EMOL.", false);
+  }
+
+  // Secondary defaults
+  setEng(defs, "look-cb-l", ["x"], "Stalk / force.", false);
+  setEng(defs, "look-cb-r", ["z"], "Stalk / force.", false);
+  setEng(defs, "look-ss", ps === "R" ? ["y", "z"] : ["y"], "Alley / force.", false);
+  setEng(defs, "look-fs", [], "Deep middle — late alley.", false);
+  setEng(defs, "look-cb-slot", ["z", "y"], "Slot edge.", false);
+  setEng(defs, "look-edge-r", ["rt", "y"], "Wide edge.", false);
+
+  // Scheme overlays
+  const playsideDl = ps === "R" ? rightmost : leftmost;
+  const backsideDl = ps === "R" ? leftmost : rightmost;
+  const playsideLb =
+    nearestToX(defs, lbs, ps === "R" ? 62 : 38) ?? lbs[lbs.length - 1];
+  const mike =
+    nearestToX(defs, lbs, 50) ?? lbs[Math.floor(lbs.length / 2)];
+  const backsideLb =
+    nearestToX(defs, lbs, ps === "R" ? 38 : 62) ?? lbs[0];
+
+  const nose =
+    nearestToX(defs, dls, 50) ?? dls[Math.floor(dls.length / 2)];
+  const threeTech =
+    nearestToX(defs, dls, ps === "R" ? 56 : 44) ?? playsideDl;
+
+  if (scheme === "dive") {
+    // Fixed hole, base blocks, FB lead
+    if (threeTech) setEng(defs, threeTech, ["rg"], "3-tech / down man — GOD base by RG.", false);
+    if (nose && nose !== threeTech)
+      setEng(defs, nose, ["lg", "c"], "Shade — C/LG gap+down.", false);
+    if (mike) setEng(defs, mike, ["fb"], "Mike — FB lead / first color.", false);
+    if (playsideLb && playsideLb !== mike)
+      setEng(defs, playsideLb, ["rt", "y"], "Sam scrape — wall edge.", false);
+  }
+
+  if (scheme === "iso") {
+    if (nose) setEng(defs, nose, ["lg", "c"], "Double post — LG/C combo. Climb on flow.", true);
+    if (mike) setEng(defs, mike, ["fb"], "Iso target — FB alone.", true);
+    if (threeTech) setEng(defs, threeTech, ["rg"], "Base/down — wall for iso crease.", false);
+    if (playsideLb && playsideLb !== mike)
+      setEng(defs, playsideLb, ["rt", "y"], "Sam scrape — edge of wall.", false);
+  }
+
+  if (scheme === "inside-zone") {
+    if (nose) setEng(defs, nose, ["lg", "c"], "Zone combo — slide, drive, peel.", true);
+    if (mike) setEng(defs, mike, ["lg", "c"], "Second-level peel — area, not jersey.", true);
+    if (threeTech)
+      setEng(defs, threeTech, ["rg", "rt"], "Playside zone combo.", true);
+    if (playsideDl)
+      setEng(defs, playsideDl, ["rt", "y"], "EMOL — zone reach / base.", false);
+    if (backsideLb)
+      setEng(defs, backsideLb, ["lt", "h"], "Backside flow — cutoff.", false);
+  }
+
+  if (scheme === "power") {
+    if (threeTech)
+      setEng(defs, threeTech, ["rg", "rt"], "Down wall — power crease.", true);
+    if (playsideDl)
+      setEng(defs, playsideDl, ["y", "rt"], "Edge of wall — down / hinge.", true);
+    if (playsideLb)
+      setEng(defs, playsideLb, ["lg", "fb"], "Kick/wrap — puller + FB.", true);
+    if (mike && mike !== playsideLb)
+      setEng(defs, mike, ["lg", "fb"], "Wrap / lead second level.", false);
+    if (backsideDl) setEng(defs, backsideDl, ["lt"], "Hinge threat — free runner risk.", false);
+    if (nose && nose !== threeTech)
+      setEng(defs, nose, ["c"], "A-gap — center blocks back on pull.", false);
+  }
+
+  if (scheme === "reach") {
+    if (playsideDl)
+      setEng(defs, playsideDl, ["rt", "y"], "EMOL — THE reach/seal for toss.", true);
+    if (playsideLb)
+      setEng(defs, playsideLb, ["y", "h"], "Force/scrape — insert/crack.", false);
+    if (threeTech) setEng(defs, threeTech, ["rg"], "Reach track — gain width.", false);
+    setEng(defs, "look-cb-r", ["z"], "Perimeter stalk — toss finish.", false);
+    setEng(defs, "look-ss", ["z", "y"], "Alley vs toss.", false);
+  }
+
+  if (scheme === "outside-zone") {
+    if (playsideDl)
+      setEng(defs, playsideDl, ["rt", "y"], "EMOL — full-line reach.", true);
+    if (threeTech)
+      setEng(defs, threeTech, ["rg", "rt"], "Zone combo — climb when reached.", true);
+    if (playsideLb)
+      setEng(defs, playsideLb, ["rg", "y"], "Flow LB — cutback key.", false);
+    if (mike) setEng(defs, mike, ["c", "lg"], "Flow — second-level peel.", false);
+    if (backsideLb)
+      setEng(defs, backsideLb, ["lt", "lg"], "Backside chase — cutoff.", false);
+  }
+
+  if (scheme === "counter-simple") {
+    // Counter left, G only pulls
+    if (leftmost) setEng(defs, leftmost, ["lt", "x"], "Edge of counter wall.", false);
+    const leftDl = dls[1] ?? nose;
+    if (leftDl) setEng(defs, leftDl, ["lt", "lg"], "Down wall — counter side.", true);
+    if (backsideLb)
+      setEng(defs, backsideLb, ["rg", "fb"], "Kick/wrap — ONLY guard pulls.", true);
+    if (mike) setEng(defs, mike, ["rg", "fb"], "Second level off single puller.", false);
+    if (rightmost) setEng(defs, rightmost, ["rt"], "Hinge — RT stays home.", false);
+    if (threeTech && threeTech !== leftDl)
+      setEng(defs, threeTech, ["c"], "Vacated by pull — center covers.", false);
+  }
+
+  if (scheme === "counter") {
+    if (leftmost) setEng(defs, leftmost, ["lt"], "Wall edge.", false);
+    const leftDl = dls[1] ?? nose;
+    if (leftDl) setEng(defs, leftDl, ["lt", "lg"], "Down wall — full counter.", true);
+    if (backsideLb)
+      setEng(defs, backsideLb, ["rg", "rt"], "Dual pull target — G lead, T trail.", true);
+    if (mike)
+      setEng(defs, mike, ["rt", "fb"], "Wrap / lead from second puller + FB.", true);
+    if (rightmost) setEng(defs, rightmost, ["y"], "Backside cutoff — G+T left.", false);
+    if (threeTech && threeTech !== leftDl)
+      setEng(defs, threeTech, ["c"], "Vacated B — center covers.", false);
+  }
+
+  // Ensure every DL has someone if still empty
+  for (const id of dls) {
+    const def = defs.find((d) => d.id === id);
+    if (def && def.engagedBy.length === 0) {
+      let bestOl: (typeof olSlots)[number] = "c";
+      let best = Infinity;
+      for (const s of olSlots) {
+        const dx = Math.abs(OL_X[s]! - def.path[0]![0]);
+        if (dx < best) {
+          best = dx;
+          bestOl = s;
+        }
+      }
+      setEng(defs, id, [bestOl], "GOD fill — nearest OL.", false);
+    }
+  }
+
+  return defs;
 }
 
 function prog(
@@ -212,8 +474,8 @@ function prog(
   values: Record<string, number>,
 ): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const d of defenders) {
-    out[d.id] = values[d.id] ?? 0;
+  for (const def of defenders) {
+    out[def.id] = values[def.id] ?? 0;
   }
   return out;
 }
@@ -225,331 +487,207 @@ function standardPhases(
   const light: Record<string, number> = {};
   const mid: Record<string, number> = {};
   const end: Record<string, number> = {};
-  for (const d of defenders) {
-    const boost = heavy.includes(d.id) ? 0.1 : 0;
-    light[d.id] = 0.15 + boost;
-    mid[d.id] = 0.55 + boost * 0.5;
-    end[d.id] = 1;
+  for (const def of defenders) {
+    const boost = heavy.includes(def.id) ? 0.1 : 0;
+    light[def.id] = 0.15 + boost;
+    mid[def.id] = 0.55 + boost * 0.5;
+    end[def.id] = 1;
   }
   return [prog(defenders, light), prog(defenders, mid), prog(defenders, end)];
 }
 
-const LOOKS: Record<string, PlayLook> = {
-  dive: (() => {
-    const defenders = front43Over({ playside: "R" });
-    // GOD: base the man in front — 1-on-1 contact, no designed double
-    defenders.forEach((x) => {
-      if (x.id === "look-dt-r") {
-        x.engagedBy = ["rg"];
-        x.doubleTeam = false;
-        x.job = "3-tech — GOD base by RG. Primary contact point.";
-      }
-      if (x.id === "look-dt-l") {
-        x.engagedBy = ["lg", "c"];
-        x.job = "Shade — C/LG gap+down. Possible accidental double.";
-      }
-      if (x.id === "look-mike") {
-        x.engagedBy = ["fb"];
-        x.job = "Mike — FB lead / first color in the hole.";
-        x.doubleTeam = false;
-      }
-    });
-    return {
-      front: "4-3 Over · GOD base",
-      note: "Gap On Down: each OL owns gap + down. Contact points are mostly 1-on-1 — doubles only if uncovered rules create them.",
-      defenders,
-      phaseProgress: standardPhases(defenders, ["look-dt-r", "look-mike"]),
-    };
-  })(),
+function frontLabel(frontId: DefFrontId): string {
+  return DEF_FRONTS.find((f) => f.id === frontId)?.label ?? frontId;
+}
 
-  iso: (() => {
-    const defenders = front43Over({
-      playside: "R",
-      combo: ["lg", "c"],
-      comboTarget: "N",
-      isoLb: "M",
-    });
-    defenders.forEach((x) => {
-      if (x.id === "look-dt-l") {
-        x.engagedBy = ["lg", "c"];
-        x.doubleTeam = true;
-        x.job = "Double post — LG/C combo. Climb on flow to Mike.";
-      }
-      if (x.id === "look-mike") {
-        x.engagedBy = ["fb"];
-        x.doubleTeam = true;
-        x.job = "Iso target — FB alone. Combo peels here on flow.";
-      }
-      if (x.id === "look-dt-r") {
-        x.engagedBy = ["rg"];
-        x.job = "3-tech base/down — wall for the iso crease.";
-      }
-      if (x.id === "look-sam") {
-        x.engagedBy = ["rt", "y"];
-        x.job = "Sam scrape — edge of the wall.";
-      }
-    });
-    return {
-      front: "4-3 Over · GOD + combo",
-      note: "First designed double (LG/C on down man) plus FB iso on Mike. Contact rings mark the combo and iso points.",
-      defenders,
-      phaseProgress: standardPhases(defenders, [
-        "look-dt-l",
-        "look-mike",
-        "look-dt-r",
-      ]),
-    };
-  })(),
+function schemeNote(scheme: SchemeId, frontId: DefFrontId): string {
+  const f = frontLabel(frontId);
+  const base: Record<SchemeId, string> = {
+    dive: `GOD base vs ${f}. Each OL owns gap + down; FB leads first color.`,
+    iso: `Combo + FB iso vs ${f}. Double the down man, climb on flow; FB isolates Mike.`,
+    "inside-zone": `Zone doubles vs ${f}. Slide-then-drive area blocks; peel to LB on flow.`,
+    power: `Gap/GOD vs ${f}. Down wall playside; puller + FB kick/wrap.`,
+    reach: `Outside/toss reach vs ${f}. Seal EMOL inside — no cutback design.`,
+    "outside-zone": `Full-line reach + cutback vs ${f}. Stretch then climb.`,
+    "counter-simple": `Simplified counter vs ${f}. Guard-only pull; RT hinges.`,
+    counter: `Full counter vs ${f}. Guard + tackle pull; dual kick/wrap.`,
+  };
+  return base[scheme];
+}
 
-  "inside-zone": (() => {
-    const defenders = front43Over({
-      playside: "R",
-      combo: ["lg", "c"],
-      comboTarget: "N",
-    });
-    defenders.forEach((x) => {
-      if (x.id === "look-dt-l") {
-        x.engagedBy = ["lg", "c"];
-        x.doubleTeam = true;
-        x.job = "Zone combo — slide to gap, drive as one, peel on flow.";
-      }
-      if (x.id === "look-mike") {
-        x.engagedBy = ["lg", "c"];
-        x.doubleTeam = true;
-        x.job = "Second-level peel from the combo — area, not jersey.";
-      }
-      if (x.id === "look-dt-r") {
-        x.engagedBy = ["rg", "rt"];
-        x.doubleTeam = true;
-        x.job = "Playside zone combo / base — vertical seam.";
-      }
-      if (x.id === "look-de-r") {
-        x.engagedBy = ["rt", "y"];
-        x.job = "EMOL — zone reach or base depending on call.";
-      }
-      if (x.id === "look-will") {
-        x.engagedBy = ["lt", "h"];
-        x.job = "Backside flow — cutoff / climb.";
-      }
-    });
-    return {
-      front: "4-3 Over · Zone doubles",
-      note: "Zone doubles are area-based: slide then drive. Rings show combo landmarks; peel to LB on flow.",
-      defenders,
-      phaseProgress: standardPhases(defenders, [
-        "look-dt-l",
-        "look-dt-r",
-        "look-mike",
-      ]),
-    };
-  })(),
+/** Primary export: resolve look for a play against a chosen front. */
+export function resolvePlayLook(
+  playId: string,
+  frontId: DefFrontId = "43-over",
+): PlayLook | null {
+  const scheme = schemeOf(playId);
+  if (!scheme) return null;
+  const raw = buildFrontAlignments(frontId);
+  const defenders = assignBlocking(raw, scheme);
+  const heavy = defenders
+    .filter((d) => d.doubleTeam || d.engagedBy.length >= 2)
+    .map((d) => d.id)
+    .slice(0, 4);
+  return {
+    frontId,
+    front: `${frontLabel(frontId)} · ${schemeLabel(scheme)}`,
+    note: schemeNote(scheme, frontId),
+    defenders,
+    phaseProgress: standardPhases(defenders, heavy),
+  };
+}
 
-  power: (() => {
-    const defenders = front43Over({ playside: "R" });
-    defenders.forEach((x) => {
-      if (x.id === "look-dt-r") {
-        x.engagedBy = ["rg", "rt"];
-        x.doubleTeam = true;
-        x.job = "Down wall — RG/RT (and Y) create the power wall.";
-      }
-      if (x.id === "look-de-r") {
-        x.engagedBy = ["y", "rt"];
-        x.doubleTeam = true;
-        x.job = "Edge of the wall — down / hinge.";
-      }
-      if (x.id === "look-sam") {
-        x.engagedBy = ["lg", "fb"];
-        x.doubleTeam = true;
-        x.job = "Kick/wrap target — puller + FB first color.";
-      }
-      if (x.id === "look-mike") {
-        x.engagedBy = ["lg", "fb"];
-        x.job = "Wrap or lead — second level off the pull.";
-      }
-      if (x.id === "look-de-l") {
-        x.engagedBy = ["lt"];
-        x.job = "Hinge threat — free runner if BS tackle quits.";
-      }
-      if (x.id === "look-dt-l") {
-        x.engagedBy = ["c"];
-        x.job = "A-gap — center blocks back when G pulls.";
-      }
-    });
-    return {
-      front: "4-3 Over · Gap / GOD",
-      note: "Down blocks wall playside; puller + FB meet Sam/Mike. Contact on the wall and at the kick/wrap point.",
-      defenders,
-      phaseProgress: standardPhases(defenders, [
-        "look-dt-r",
-        "look-de-r",
-        "look-sam",
-      ]),
-    };
-  })(),
+function schemeLabel(scheme: SchemeId): string {
+  const m: Record<SchemeId, string> = {
+    dive: "GOD base",
+    iso: "combo + iso",
+    "inside-zone": "zone doubles",
+    power: "gap / pull",
+    reach: "outside / toss",
+    "outside-zone": "OZ stretch",
+    "counter-simple": "CTR-S (G)",
+    counter: "CTR (G+T)",
+  };
+  return m[scheme];
+}
 
-  reach: (() => {
-    const defenders = front43Over({ playside: "R" });
-    defenders.forEach((x) => {
-      if (x.id === "look-de-r") {
-        x.engagedBy = ["rt", "y"];
-        x.doubleTeam = true;
-        x.job = "EMOL — THE reach/seal. Keep him inside so toss stays outside.";
-      }
-      if (x.id === "look-sam") {
-        x.engagedBy = ["y", "h"];
-        x.job = "Force/scrape — insert or crack help.";
-      }
-      if (x.id === "look-dt-r") {
-        x.engagedBy = ["rg"];
-        x.job = "Reach track — gain width with the line.";
-      }
-      if (x.id === "look-cb-r") {
-        x.engagedBy = ["z"];
-        x.job = "Perimeter stalk — toss finish.";
-      }
-      if (x.id === "look-ss") {
-        x.engagedBy = ["z", "y"];
-        x.job = "Alley — force or fold vs toss.";
-      }
-    });
-    return {
-      front: "4-3 Over · Outside / toss",
-      note: "Pure outside run. Primary contact is the EMOL seal (RT/Y). No designed cutback double — edge or fail.",
-      defenders,
-      phaseProgress: standardPhases(defenders, ["look-de-r", "look-sam", "look-cb-r"]),
-    };
-  })(),
+/**
+ * Build OL (and skill) assignment paths toward engaged defenders.
+ * Used when "Blocking assignment" mode is on.
+ */
+export function buildAssignmentPaths(
+  play: Play,
+  defenders: LookDefender[],
+): { paths: Record<string, FieldPoint[]>; jobs: Record<string, string> } {
+  const paths: Record<string, FieldPoint[]> = {};
+  const jobs: Record<string, string> = {};
+  const byId = new Map(defenders.map((d) => [d.id, d]));
 
-  "outside-zone": (() => {
-    const defenders = front43Over({ playside: "R", combo: ["rg", "rt"], comboTarget: "T" });
-    defenders.forEach((x) => {
-      if (x.id === "look-de-r") {
-        x.engagedBy = ["rt", "y"];
-        x.doubleTeam = true;
-        x.job = "EMOL — reach in unison with the five.";
-      }
-      if (x.id === "look-dt-r") {
-        x.engagedBy = ["rg", "rt"];
-        x.doubleTeam = true;
-        x.job = "Zone combo — climb when reached.";
-      }
-      if (x.id === "look-sam") {
-        x.engagedBy = ["rg", "y"];
-        x.job = "Flow LB — cutback key if crease opens inside.";
-      }
-      if (x.id === "look-mike") {
-        x.engagedBy = ["c", "lg"];
-        x.job = "Flow — second-level zone peel.";
-      }
-      if (x.id === "look-will") {
-        x.engagedBy = ["lt", "lg"];
-        x.job = "Backside chase — cutoff.";
-      }
-    });
-    return {
-      front: "4-3 Over · OZ stretch",
-      note: "Full-line reach contact across the front. Cutback appears when a defender crosses face after the stretch.",
-      defenders,
-      phaseProgress: standardPhases(defenders, [
-        "look-de-r",
-        "look-dt-r",
-        "look-sam",
-      ]),
-    };
-  })(),
+  // Reverse map: offense role -> list of defenders they engage
+  const targets = new Map<string, LookDefender[]>();
+  for (const def of defenders) {
+    for (const oid of def.engagedBy) {
+      const list = targets.get(oid) ?? [];
+      list.push(def);
+      targets.set(oid, list);
+    }
+  }
 
-  "counter-simple": (() => {
-    const defenders = front43Over({ playside: "L" });
-    // Counter back to the left — only G pulls from right
-    defenders.forEach((x) => {
-      if (x.id === "look-dt-l") {
-        x.engagedBy = ["lt", "lg"];
-        x.doubleTeam = true;
-        x.job = "Down wall — counter-side contact.";
-      }
-      if (x.id === "look-de-l") {
-        x.engagedBy = ["lt", "x"];
-        x.job = "Edge of counter wall.";
-      }
-      if (x.id === "look-will") {
-        x.engagedBy = ["rg", "fb"];
-        x.doubleTeam = true;
-        x.job = "Kick/wrap — ONLY guard pulls to this color.";
-      }
-      if (x.id === "look-mike") {
-        x.engagedBy = ["rg", "fb"];
-        x.job = "Second level off single puller.";
-      }
-      if (x.id === "look-de-r") {
-        x.engagedBy = ["rt"];
-        x.job = "Hinge side — RT stays home (no tackle pull).";
-      }
-      if (x.id === "look-dt-r") {
-        x.engagedBy = ["c"];
-        x.job = "Vacated by pull — center covers.";
-      }
-    });
-    return {
-      front: "4-3 Over · CTR-S (G only)",
-      note: "Simplified counter: single puller (G). Contact on the down wall and at the kick. RT hinges vs DE — not a second puller.",
-      defenders,
-      phaseProgress: standardPhases(defenders, [
-        "look-dt-l",
-        "look-will",
-        "look-de-r",
-      ]),
-    };
-  })(),
+  const scheme = schemeOf(play.id);
+  const ps = scheme ? playsideOf(scheme) : "R";
 
-  counter: (() => {
-    const defenders = front43Over({ playside: "L" });
-    defenders.forEach((x) => {
-      if (x.id === "look-dt-l") {
-        x.engagedBy = ["lt", "lg"];
-        x.doubleTeam = true;
-        x.job = "Down wall — full counter side.";
+  for (const role of play.roles) {
+    const start = role.path[0] ?? ([50, 52] as FieldPoint);
+    const assigned = targets.get(role.id) ?? [];
+    if (assigned.length === 0) {
+      // Keep a subtle settle path — skill players without assignment
+      if (["qb", "rb", "x", "z", "h"].includes(role.id)) {
+        continue; // keep generic ball-carrier / route paths
       }
-      if (x.id === "look-de-l") {
-        x.engagedBy = ["lt"];
-        x.job = "Wall edge.";
-      }
-      if (x.id === "look-will") {
-        x.engagedBy = ["rg", "rt"];
-        x.doubleTeam = true;
-        x.job = "Dual pull target — G lead, T trail.";
-      }
-      if (x.id === "look-mike") {
-        x.engagedBy = ["rt", "fb"];
-        x.doubleTeam = true;
-        x.job = "Wrap / lead from second puller + FB.";
-      }
-      if (x.id === "look-de-r") {
-        x.engagedBy = ["y"];
-        x.job = "Backside cutoff — both G and T left.";
-      }
-      if (x.id === "look-dt-r") {
-        x.engagedBy = ["c"];
-        x.job = "Vacated B — center must cover.";
-      }
-    });
-    return {
-      front: "4-3 Over · Full CTR (G+T)",
-      note: "Full counter: two pullers. Contact denser at the kick/wrap — G and T both arrive. Backside hinge replaced by TE cutoff.",
-      defenders,
-      phaseProgress: standardPhases(defenders, [
-        "look-will",
-        "look-mike",
-        "look-dt-l",
-      ]),
-    };
-  })(),
-};
+      paths[role.id] = [
+        start,
+        [start[0], start[1] - 2],
+        [start[0], start[1] - 4],
+      ];
+      jobs[role.id] = "Uncovered — climb to first color / help.";
+      continue;
+    }
 
-/** Attach look data onto offensive plays (mutates in place). */
+    // Sort assigned by depth (DL first, then LB)
+    const sorted = [...assigned].sort(
+      (a, b) => (a.path[0]?.[1] ?? 50) - (b.path[0]?.[1] ?? 50),
+    );
+    const primary = sorted[0]!;
+    const secondary = sorted[1];
+    const pAlign = primary.path[0]!;
+    const isPull =
+      /pull/i.test(role.job) ||
+      /pull/i.test(role.label) ||
+      (scheme === "power" && role.id === "lg") ||
+      (scheme === "counter-simple" && role.id === "rg") ||
+      (scheme === "counter" && (role.id === "rg" || role.id === "rt"));
+
+    if (isPull) {
+      // Keep lateral pull shape but finish at assignment
+      const pullY = start[1];
+      const midX = (start[0] + pAlign[0]) / 2;
+      paths[role.id] = [
+        start,
+        [start[0] + (ps === "R" ? -4 : 4), pullY],
+        [midX, pullY - 0.5],
+        [pAlign[0], pAlign[1] + 1],
+        [pAlign[0], pAlign[1] - 2],
+      ];
+      jobs[role.id] = primary.job;
+      continue;
+    }
+
+    const isReach =
+      scheme === "reach" ||
+      scheme === "outside-zone" ||
+      /reach/i.test(role.job);
+
+    if (isReach && ["lt", "lg", "c", "rg", "rt", "y"].includes(role.id)) {
+      const dir = ps === "R" ? 1 : -1;
+      paths[role.id] = [
+        start,
+        [start[0] + dir * 3, start[1] - 0.5],
+        [pAlign[0] - dir * 0.5, pAlign[1] + 0.8],
+        [pAlign[0] + dir * 1.5, pAlign[1] - 1.5],
+        secondary
+          ? [secondary.path[0]![0], secondary.path[0]![1] - 1]
+          : [pAlign[0] + dir * 2, pAlign[1] - 4],
+      ];
+      jobs[role.id] = secondary
+        ? `${primary.job} → climb ${secondary.tag}`
+        : primary.job;
+      continue;
+    }
+
+    // Base / down / combo
+    if (secondary && primary.doubleTeam) {
+      // Combo: post on primary, climb secondary
+      paths[role.id] = [
+        start,
+        [(start[0] + pAlign[0]) / 2, (start[1] + pAlign[1]) / 2 + 0.5],
+        [pAlign[0], pAlign[1] + 0.6],
+        [
+          (pAlign[0] + secondary.path[0]![0]) / 2,
+          (pAlign[1] + secondary.path[0]![1]) / 2,
+        ],
+        [secondary.path[0]![0], secondary.path[0]![1] - 1.5],
+      ];
+      jobs[role.id] = `Combo ${primary.tag} → climb ${secondary.tag}`;
+    } else {
+      const downDir =
+        pAlign[0] < start[0] - 1 ? -1 : pAlign[0] > start[0] + 1 ? 1 : 0;
+      paths[role.id] = [
+        start,
+        [start[0] + downDir * 1.2, start[1] - 1],
+        [pAlign[0], pAlign[1] + 0.8],
+        [pAlign[0] + downDir * 0.8, pAlign[1] - 2.5],
+        [pAlign[0] + downDir * 1.2, pAlign[1] - 5],
+      ];
+      jobs[role.id] = primary.job;
+    }
+  }
+
+  // QB / RB keep generic play paths for ball path clarity
+  for (const role of play.roles) {
+    if (role.id === "qb" || role.id === "rb") {
+      delete paths[role.id];
+      delete jobs[role.id];
+    }
+  }
+
+  return { paths, jobs };
+}
+
+/** Apply default 4-3 Over looks onto offensive plays (mutates in place). */
 export function applyPlayLooks(plays: Play[]): void {
   for (const play of plays) {
     if (play.side !== "offense") continue;
-    const look = LOOKS[play.id];
+    const look = resolvePlayLook(play.id, "43-over");
     if (!look) continue;
     play.lookFront = look.front;
     play.lookNote = look.note;
@@ -583,4 +721,42 @@ export function lookProgressAtPhaseEnd(
     if (typeof v === "number") return v;
   }
   return 0;
+}
+
+/** Build a play snapshot for the simulator with front + OL path mode. */
+export function buildSimPlay(
+  play: Play,
+  frontId: DefFrontId,
+  olMode: "generic" | "assignment",
+): Play {
+  const look = resolvePlayLook(play.id, frontId);
+  if (!look) {
+    return play;
+  }
+
+  let roles: PlayRole[] = play.roles;
+  if (olMode === "assignment") {
+    const { paths, jobs } = buildAssignmentPaths(play, look.defenders);
+    roles = play.roles.map((r) => {
+      const path = paths[r.id];
+      if (!path) return r;
+      return {
+        ...r,
+        path,
+        job: jobs[r.id] ?? r.job,
+      };
+    });
+  }
+
+  return {
+    ...play,
+    look: look.defenders,
+    lookFront: look.front,
+    lookNote: look.note,
+    roles,
+    phases: play.phases.map((ph, i) => ({
+      ...ph,
+      lookProgress: look.phaseProgress[i] ?? look.phaseProgress.at(-1),
+    })),
+  };
 }
