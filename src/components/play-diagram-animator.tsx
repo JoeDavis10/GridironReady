@@ -3,6 +3,8 @@ import {
   ChevronLeft,
   ChevronRight,
   FastForward,
+  Maximize2,
+  Minimize2,
   Pause,
   Play as PlayIcon,
   RotateCcw,
@@ -83,7 +85,7 @@ function deconflictPositions(
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const dist = Math.hypot(dx, dy) || 0.001;
-        const min = a.r + b.r + 0.55;
+        const min = a.r + b.r + 0.75;
         if (dist < min) {
           const push = (min - dist) / 2;
           const nx = dx / dist;
@@ -232,6 +234,8 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
   const [focusLookId, setFocusLookId] = useState<string | null>(null);
   const [showLook, setShowLook] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [immersive, setImmersive] = useState(false);
+  const shellRef = useRef<HTMLDivElement>(null);
 
   const rafRef = useRef<number | null>(null);
   const lastTs = useRef<number | null>(null);
@@ -273,11 +277,34 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
     setFocusRoleId(null);
     setFocusLookId(null);
     setShowLook(true);
+    setImmersive(false);
     phaseRef.current = 0;
     progressRef.current = 0;
     playingRef.current = false;
     lastTs.current = null;
   }, [play.id]);
+
+  useEffect(() => {
+    if (!immersive) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setImmersive(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const el = shellRef.current;
+    const req = el?.requestFullscreen?.bind(el);
+    if (req && !document.fullscreenElement) {
+      void req().catch(() => {});
+    }
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("keydown", onKey);
+      if (document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => {});
+      }
+    };
+  }, [immersive]);
 
   const goToPhase = useCallback(
     (index: number) => {
@@ -374,6 +401,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
 
   /** Display positions with deconflict so pullers don't bury under OL */
   const displayPos = useMemo(() => {
+    const scale = immersive ? 1.35 : 1.12;
     const items: {
       id: string;
       x: number;
@@ -383,17 +411,23 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
     }[] = [];
     for (const s of roleStates) {
       const focused = focusRoleId === s.role.id;
-      const r = s.pull ? 2.35 : focused ? 2.3 : 1.95;
+      const r = (s.pull ? 2.55 : focused ? 2.5 : 2.15) * scale;
       items.push({
         id: s.role.id,
         x: s.pos[0],
         y: s.pos[1],
         r,
-        priority: focused ? 3 : s.pull ? 2 : s.role.highlightPhases?.includes(phaseIndex) ? 1 : 0,
+        priority: focused
+          ? 3
+          : s.pull
+            ? 2
+            : s.role.highlightPhases?.includes(phaseIndex)
+              ? 1
+              : 0,
       });
     }
     return deconflictPositions(items);
-  }, [roleStates, focusRoleId, phaseIndex]);
+  }, [roleStates, focusRoleId, phaseIndex, immersive]);
 
   const rolePosById = useMemo(() => {
     const m = new Map<string, [number, number]>();
@@ -459,13 +493,36 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
     });
   }, [roleStates, focusRoleId]);
 
+  const S = immersive ? 1.35 : 1.12;
+  const pathW = (base: number) => base * S;
+  const fontS = (base: number) => base * S;
+
   return (
-    <div className="w-full max-w-full min-w-0 space-y-4 overflow-x-hidden">
-      <div className="w-full max-w-full min-w-0 overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-elevated)]">
-        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-[var(--color-border)] px-3 py-2">
+    <div
+      className={cn(
+        "w-full max-w-full min-w-0 space-y-4 overflow-x-hidden",
+        immersive &&
+          "fixed inset-0 z-[200] flex flex-col space-y-0 overflow-hidden bg-[var(--color-bg)] p-0",
+      )}
+    >
+      <div
+        ref={shellRef}
+        className={cn(
+          "w-full max-w-full min-w-0 overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-elevated)]",
+          immersive &&
+            "flex h-full min-h-0 flex-1 flex-col rounded-none border-0 bg-[var(--color-bg)]",
+        )}
+      >
+        <div
+          className={cn(
+            "flex flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-[var(--color-border)] px-3 py-2",
+            immersive && "shrink-0 bg-[var(--color-surface)] px-4 py-3",
+          )}
+        >
           <div className="min-w-0 flex-1 basis-[10rem]">
             <p className="truncate text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--color-subtle)]">
               {play.formation}
+              {immersive ? ` · ${play.name}` : ""}
             </p>
             {hasLook && play.lookFront && (
               <p className="truncate text-[10px] text-[var(--color-muted)]">
@@ -483,7 +540,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                 type="button"
                 onClick={() => setShowLook((v) => !v)}
                 className={cn(
-                  "h-8 shrink-0 rounded-full border px-3 text-[10px] font-semibold",
+                  "h-9 shrink-0 rounded-full border px-3 text-[10px] font-semibold touch-manipulation",
                   showLook
                     ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
                     : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]",
@@ -492,17 +549,53 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                 {showLook ? "Defense on" : "Defense off"}
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setImmersive((v) => !v)}
+              aria-label={immersive ? "Exit full screen" : "Full screen HD"}
+              className={cn(
+                "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[10px] font-semibold touch-manipulation",
+                immersive
+                  ? "border-transparent bg-[var(--color-fg)] text-[var(--color-bg)]"
+                  : "border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-fg)]",
+              )}
+            >
+              {immersive ? (
+                <Minimize2 className="size-3.5" aria-hidden />
+              ) : (
+                <Maximize2 className="size-3.5" aria-hidden />
+              )}
+              {immersive ? "Exit" : "Full screen"}
+            </button>
           </div>
         </div>
 
+        <div
+          className={cn(
+            "relative w-full",
+            immersive &&
+              "flex min-h-0 flex-1 items-center justify-center bg-[var(--color-surface)] px-1 py-1 sm:px-3 sm:py-2",
+          )}
+        >
         <svg
           viewBox="0 0 100 100"
-          className="aspect-[5/6] w-full max-w-full"
+          width="100%"
+          height="100%"
+          preserveAspectRatio="xMidYMid meet"
+          className={cn(
+            "w-full max-w-full",
+            immersive
+              ? "h-full max-h-full w-full max-w-full aspect-square"
+              : "aspect-[5/6]",
+          )}
+          style={{
+            shapeRendering: "geometricPrecision",
+            textRendering: "geometricPrecision",
+          }}
           role="img"
           aria-label={`${play.name} play diagram`}
         >
           <defs>
-            {/* Arrow markers per role color for pull paths */}
             {ROLE_HUES.map((hue, i) => (
               <marker
                 key={`m-${i}`}
@@ -516,40 +609,54 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                 <path d="M0,0 L4,2 L0,4 Z" fill={hue} />
               </marker>
             ))}
+            <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="0.35" result="b" />
+              <feMerge>
+                <feMergeNode in="b" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
           </defs>
 
           <rect x="0" y="0" width="100" height="100" fill="var(--color-surface)" />
           <rect
-            x="4"
-            y="4"
-            width="92"
-            height="92"
-            rx="1.5"
-            fill="color-mix(in oklab, var(--color-primary-dim) 30%, var(--color-surface))"
+            x="3"
+            y="3"
+            width="94"
+            height="94"
+            rx="1.2"
+            fill="color-mix(in oklab, var(--color-primary-dim) 22%, var(--color-surface))"
             stroke="var(--color-border-strong)"
-            strokeWidth="0.4"
+            strokeWidth={0.45 * S}
           />
-          {[20, 35, 50, 65, 80].map((y) => (
+          {[15, 25, 35, 45, 50, 55, 65, 75, 85].map((y) => (
             <line
               key={y}
-              x1="6"
-              x2="94"
+              x1="5"
+              x2="95"
               y1={y}
               y2={y}
               stroke="var(--color-border)"
-              strokeWidth={y === 50 ? 0.55 : 0.25}
-              strokeDasharray={y === 50 ? undefined : "1.2 1.2"}
-              opacity={y === 50 ? 0.9 : 0.5}
+              strokeWidth={y === 50 ? 0.7 * S : 0.28 * S}
+              strokeDasharray={y === 50 ? undefined : "1.1 1.3"}
+              opacity={y === 50 ? 0.95 : 0.4}
             />
+          ))}
+          {[25, 40, 60, 75].map((y) => (
+            <g key={`h-${y}`} opacity={0.45}>
+              <line x1="28" x2="33" y1={y} y2={y} stroke="var(--color-fg)" strokeWidth={0.35 * S} />
+              <line x1="67" x2="72" y1={y} y2={y} stroke="var(--color-fg)" strokeWidth={0.35 * S} />
+            </g>
           ))}
           <text
             x="50"
-            y="51.8"
+            y="51.9"
             textAnchor="middle"
             fill="var(--color-subtle)"
-            fontSize="2.2"
+            fontSize={fontS(2.4)}
             fontFamily="var(--font-body)"
-            opacity={0.65}
+            fontWeight="600"
+            opacity={0.75}
           >
             LOS
           </text>
@@ -573,11 +680,11 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                 d={d}
                 fill="none"
                 stroke={roleColor(i)}
-                strokeWidth={pull || isFocus ? 0.85 : 0.4}
+                strokeWidth={pathW(pull || isFocus ? 1.05 : 0.55)}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 opacity={dim}
-                strokeDasharray={pull ? undefined : "1.3 1.1"}
+                strokeDasharray={pull ? undefined : "1.4 1.0"}
                 markerEnd={pull || isFocus ? `url(#arrow-${i % ROLE_HUES.length})` : undefined}
               />
             );
@@ -589,24 +696,27 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
             .map(({ role, i, trail }) => {
               const start = trail[0]!;
               return (
-                <g key={`ghost-${role.id}`} opacity={0.45}>
+                <g key={`ghost-${role.id}`} opacity={0.55}>
                   <circle
                     cx={start[0]}
                     cy={start[1]}
-                    r={1.6}
+                    r={1.85 * S}
                     fill="none"
                     stroke={roleColor(i)}
-                    strokeWidth="0.35"
+                    strokeWidth={0.4 * S}
                     strokeDasharray="0.8 0.6"
                   />
                   <text
                     x={start[0]}
-                    y={start[1] - 2.4}
+                    y={start[1] - 2.6 * S}
                     textAnchor="middle"
                     fill={roleColor(i)}
-                    fontSize="1.6"
+                    fontSize={fontS(1.85)}
                     fontWeight="700"
                     fontFamily="var(--font-display)"
+                    stroke="var(--color-surface)"
+                    strokeWidth={0.45 * S}
+                    paintOrder="stroke"
                   >
                     {role.tag}·pull
                   </text>
@@ -620,9 +730,9 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
               focusLookId == null ||
               focusLookId === c.def.id ||
               (focusRoleId != null && c.key.startsWith(focusRoleId));
-            const sw = 0.3 + c.force * 0.4;
+            const sw = pathW(0.4 + c.force * 0.5);
             return (
-              <g key={c.key} opacity={active ? 0.75 : 0.12}>
+              <g key={c.key} opacity={active ? 0.85 : 0.14}>
                 <line
                   x1={c.x1}
                   y1={c.y1}
@@ -641,11 +751,11 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
               key={`dbl-${def.id}`}
               cx={pos[0]}
               cy={pos[1]}
-              r={3.2 + pressure * 0.8}
+              r={(3.4 + pressure * 0.9) * S}
               fill="none"
               stroke={DOUBLE}
-              strokeWidth="0.35"
-              opacity={0.35 + pressure * 0.3}
+              strokeWidth={0.4 * S}
+              opacity={0.4 + pressure * 0.35}
               strokeDasharray="1 0.8"
             />
           ))}
@@ -658,12 +768,12 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
               (focusRoleId != null &&
                 !def.engagedBy.includes(focusRoleId) &&
                 focusLookId == null);
-            const s = (focusedNow ? 2.2 : 1.85) + pressure * 0.2;
+            const s = ((focusedNow ? 2.45 : 2.1) + pressure * 0.22) * S;
             return (
               <g
                 key={def.id}
                 transform={`translate(${pos[0]}, ${pos[1]})`}
-                opacity={dimmed ? 0.22 : 0.9}
+                opacity={dimmed ? 0.22 : 0.95}
                 className="cursor-pointer"
                 onClick={() => {
                   setFocusRoleId(null);
@@ -676,13 +786,13 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                   stroke={
                     def.doubleTeam || pressure > 0.45 ? DOUBLE : DEF_STROKE
                   }
-                  strokeWidth={0.35}
+                  strokeWidth={0.45 * S}
                 />
                 <text
                   textAnchor="middle"
-                  y="0.7"
+                  y={0.75 * S}
                   fill={DEF_STROKE}
-                  fontSize={def.tag.length > 2 ? "1.35" : "1.5"}
+                  fontSize={fontS(def.tag.length > 2 ? 1.55 : 1.75)}
                   fontWeight="700"
                   fontFamily="var(--font-display)"
                 >
@@ -704,7 +814,14 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                     ?.engagedBy.includes(role.id) ?? false
                 ));
             const [dx, dy] = displayPos.get(role.id) ?? truePos;
-            const r = pull ? (focusedNow ? 2.55 : 2.25) : focusedNow ? 2.35 : 1.95;
+            const r =
+              (pull
+                ? focusedNow
+                  ? 2.85
+                  : 2.55
+                : focusedNow
+                  ? 2.65
+                  : 2.25) * S;
             const hue = roleColor(i);
             return (
               <g
@@ -717,44 +834,43 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                   setFocusRoleId((cur) => (cur === role.id ? null : role.id));
                 }}
               >
-                {/* Puller halo so they read through traffic */}
                 {pull && (
                   <circle
-                    r={r + 0.9}
+                    r={r + 1.0 * S}
                     fill="none"
                     stroke={hue}
-                    strokeWidth="0.35"
-                    opacity={0.7}
+                    strokeWidth={0.4 * S}
+                    opacity={0.75}
                     strokeDasharray="1 0.7"
+                    filter="url(#softGlow)"
                   />
                 )}
                 <circle
                   r={r}
                   fill={hue}
                   stroke={pull ? "#fff" : "var(--color-bg)"}
-                  strokeWidth={pull ? 0.55 : 0.35}
+                  strokeWidth={(pull ? 0.65 : 0.4) * S}
                 />
                 <text
                   textAnchor="middle"
-                  y="0.75"
+                  y={0.85 * S}
                   fill={pull ? "#1a1a1a" : "var(--color-bg)"}
-                  fontSize={role.tag.length > 2 ? "1.45" : "1.65"}
+                  fontSize={fontS(role.tag.length > 2 ? 1.7 : 1.95)}
                   fontWeight="800"
                   fontFamily="var(--font-display)"
                 >
                   {role.tag}
                 </text>
-                {/* Offset name tag for pullers / focus */}
-                {(pull || focusedNow) && (
+                {(pull || focusedNow || immersive) && (
                   <text
                     textAnchor="middle"
-                    y={-(r + 1.6)}
+                    y={-(r + 1.55 * S)}
                     fill={hue}
-                    fontSize="1.7"
+                    fontSize={fontS(1.85)}
                     fontWeight="700"
                     fontFamily="var(--font-display)"
                     stroke="var(--color-surface)"
-                    strokeWidth="0.5"
+                    strokeWidth={0.55 * S}
                     paintOrder="stroke"
                   >
                     {pull ? `${role.tag} pull` : role.tag}
@@ -764,9 +880,15 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
             );
           })}
         </svg>
+        </div>
 
         {hasLook && showLook && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-[var(--color-border)] px-3 py-2 text-[10px] text-[var(--color-subtle)]">
+          <div
+            className={cn(
+              "flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-[var(--color-border)] px-3 py-2 text-[10px] text-[var(--color-subtle)]",
+              immersive && "shrink-0",
+            )}
+          >
             <span className="inline-flex items-center gap-1.5">
               <span className="size-2.5 shrink-0 rounded-full border border-white bg-[var(--color-primary)]" />
               Pull (halo)
@@ -784,9 +906,8 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
             </span>
           </div>
         )}
-      </div>
 
-      {hasLook && play.lookNote && showLook && (
+      {hasLook && play.lookNote && showLook && !immersive && (
         <p className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs leading-relaxed text-[var(--color-muted)]">
           <span className="font-semibold text-[var(--color-fg)]">
             Reactive D · GOD:{" "}
@@ -795,7 +916,13 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
         </p>
       )}
 
-      <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
+      <div
+        className={cn(
+          "flex w-full min-w-0 flex-wrap items-center gap-2",
+          immersive &&
+            "mt-auto shrink-0 border-t border-[var(--color-border)] bg-[color-mix(in_oklab,var(--color-bg)_96%,transparent)] px-3 py-3 backdrop-blur-md",
+        )}
+      >
         <Button
           size="sm"
           variant="secondary"
@@ -897,7 +1024,9 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
           ))}
         </ul>
       </section>
+      </div>
 
+      {!immersive && (
       <section className="w-full max-w-full min-w-0">
         <ChipRail label={`Offense (${play.roles.length}) — swipe or tap arrows`}>
           {play.roles.map((role, i) => {
@@ -951,8 +1080,9 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
           />
         )}
       </section>
+      )}
 
-      {hasLook && showLook && (
+      {hasLook && showLook && !immersive && (
         <section className="w-full max-w-full min-w-0 pb-2">
           <ChipRail label={`Defense (${look.length}) — swipe or tap arrows`}>
             {look.map((def) => {
