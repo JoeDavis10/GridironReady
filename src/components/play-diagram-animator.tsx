@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   FastForward,
   Maximize2,
   Minimize2,
@@ -256,6 +258,9 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
   const [frontId, setFrontId] = useState<DefFrontId>("43-over");
   /** generic = install path lines; assignment = GOD paths vs selected front */
   const [olMode, setOlMode] = useState<"generic" | "assignment">("assignment");
+  /** Immersive: phase coaching collapsed so diagram owns the screen */
+  const [showPhasePanel, setShowPhasePanel] = useState(false);
+  const [showImmersiveOpts, setShowImmersiveOpts] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
 
   const rafRef = useRef<number | null>(null);
@@ -307,6 +312,8 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
     setFocusLookId(null);
     setShowLook(true);
     setImmersive(false);
+    setShowPhasePanel(false);
+    setShowImmersiveOpts(false);
     setOlMode("assignment");
     // keep frontId across plays so coach can compare same front
     phaseRef.current = 0;
@@ -325,6 +332,13 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
     playingRef.current = false;
     lastTs.current = null;
   }, [frontId, olMode]);
+
+  useEffect(() => {
+    if (immersive) {
+      setShowPhasePanel(false);
+      setShowImmersiveOpts(false);
+    }
+  }, [immersive]);
 
   useEffect(() => {
     if (!immersive) return;
@@ -443,7 +457,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
 
   /** Display positions with deconflict so pullers don't bury under OL */
   const displayPos = useMemo(() => {
-    const scale = immersive ? 1.35 : 1.12;
+    const scale = immersive ? 1.2 : 1.08;
     const items: {
       id: string;
       x: number;
@@ -535,7 +549,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
     });
   }, [roleStates, focusRoleId]);
 
-  const S = immersive ? 1.35 : 1.12;
+  const S = immersive ? 1.2 : 1.08;
   const pathW = (base: number) => base * S;
   const fontS = (base: number) => base * S;
 
@@ -558,38 +572,62 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
         <div
           className={cn(
             "flex flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-[var(--color-border)] px-3 py-2",
-            immersive && "shrink-0 bg-[var(--color-surface)] px-4 py-3",
+            immersive && "shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5",
           )}
         >
-          <div className="min-w-0 flex-1 basis-[10rem]">
+          <div className="min-w-0 flex-1 basis-[8rem]">
             <p className="truncate text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--color-subtle)]">
-              {play.formation}
-              {immersive ? ` · ${play.name}` : ""}
+              {immersive ? play.name : play.formation}
             </p>
-            {hasLook && simPlay.lookFront && (
+            {!immersive && hasLook && simPlay.lookFront && (
               <p className="truncate text-[10px] text-[var(--color-muted)]">
                 vs {simPlay.lookFront}
                 {olMode === "assignment" ? " · assignment" : " · generic"}
               </p>
             )}
+            {immersive && (
+              <p className="truncate text-[10px] text-[var(--color-muted)]">
+                {simPlay.lookFront
+                  ? `vs ${DEF_FRONTS.find((f) => f.id === frontId)?.short ?? frontId}`
+                  : play.formation}
+                {" · "}
+                Phase {phaseIndex + 1}/{simPlay.phases.length}
+              </p>
+            )}
           </div>
-          <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
-            <p className="text-[11px] font-semibold tabular-nums text-[var(--color-muted)]">
-              {simPlay.roles.length}
-              {hasLook && showLook ? ` + ${look.length} D` : ""} players
-            </p>
+          <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-1.5">
+            {!immersive && (
+              <p className="text-[11px] font-semibold tabular-nums text-[var(--color-muted)]">
+                {simPlay.roles.length}
+                {hasLook && showLook ? ` + ${look.length} D` : ""} players
+              </p>
+            )}
             {hasLook && (
               <button
                 type="button"
                 onClick={() => setShowLook((v) => !v)}
                 className={cn(
-                  "h-9 shrink-0 rounded-full border px-3 text-[10px] font-semibold touch-manipulation",
+                  "h-8 shrink-0 rounded-full border px-2.5 text-[10px] font-semibold touch-manipulation",
                   showLook
                     ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
                     : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]",
                 )}
               >
-                {showLook ? "Defense on" : "Defense off"}
+                {showLook ? "D on" : "D off"}
+              </button>
+            )}
+            {immersive && (
+              <button
+                type="button"
+                onClick={() => setShowImmersiveOpts((v) => !v)}
+                className={cn(
+                  "h-8 shrink-0 rounded-full border px-2.5 text-[10px] font-semibold touch-manipulation",
+                  showImmersiveOpts
+                    ? "border-transparent bg-[var(--color-elevated)] text-[var(--color-fg)]"
+                    : "border-[var(--color-border)] text-[var(--color-muted)]",
+                )}
+              >
+                Fronts
               </button>
             )}
             <button
@@ -597,7 +635,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
               onClick={() => setImmersive((v) => !v)}
               aria-label={immersive ? "Exit full screen" : "Full screen HD"}
               className={cn(
-                "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[10px] font-semibold touch-manipulation",
+                "inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-[10px] font-semibold touch-manipulation",
                 immersive
                   ? "border-transparent bg-[var(--color-fg)] text-[var(--color-bg)]"
                   : "border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-fg)]",
@@ -617,7 +655,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
           className={cn(
             "relative w-full",
             immersive &&
-              "flex min-h-0 flex-1 items-center justify-center bg-[var(--color-surface)] px-1 py-1 sm:px-3 sm:py-2",
+              "flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[var(--color-surface)]",
           )}
         >
         <svg
@@ -627,8 +665,9 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
           preserveAspectRatio="xMidYMid meet"
           className={cn(
             "w-full max-w-full",
+            // Fill every free pixel in immersive; non-immersive keeps readable aspect
             immersive
-              ? "h-full max-h-full w-full max-w-full aspect-square"
+              ? "h-full min-h-0 w-full max-h-full"
               : "aspect-[5/6]",
           )}
           style={{
@@ -904,7 +943,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                 >
                   {role.tag}
                 </text>
-                {(pull || focusedNow || immersive) && (
+                {(pull || focusedNow) && (
                   <text
                     textAnchor="middle"
                     y={-(r + 1.55 * S)}
@@ -925,12 +964,9 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
         </svg>
         </div>
 
-        {hasLook && showLook && (
+        {hasLook && showLook && !immersive && (
           <div
-            className={cn(
-              "flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-[var(--color-border)] px-3 py-2 text-[10px] text-[var(--color-subtle)]",
-              immersive && "shrink-0",
-            )}
+            className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-[var(--color-border)] px-3 py-2 text-[10px] text-[var(--color-subtle)]"
           >
             <span className="inline-flex items-center gap-1.5">
               <span className="size-2.5 shrink-0 rounded-full border border-white bg-[var(--color-primary)]" />
@@ -1014,18 +1050,35 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
         </div>
       )}
 
-      {canSwitchFront && immersive && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
-          <button
-            type="button"
-            onClick={() =>
-              setOlMode((m) => (m === "generic" ? "assignment" : "generic"))
-            }
-            className="h-9 shrink-0 rounded-full border border-[var(--color-border-strong)] bg-[var(--color-elevated)] px-3 text-[10px] font-semibold"
-          >
-            {olMode === "assignment" ? "Assign on" : "Generic"}
-          </button>
-          <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto overscroll-x-contain touch-pan-x">
+      {canSwitchFront && immersive && showImmersiveOpts && (
+        <div className="shrink-0 space-y-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-2">
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => setOlMode("generic")}
+              className={cn(
+                "h-8 min-w-0 flex-1 rounded-full border text-[10px] font-semibold",
+                olMode === "generic"
+                  ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
+                  : "border-[var(--color-border)] text-[var(--color-muted)]",
+              )}
+            >
+              Generic
+            </button>
+            <button
+              type="button"
+              onClick={() => setOlMode("assignment")}
+              className={cn(
+                "h-8 min-w-0 flex-1 rounded-full border text-[10px] font-semibold",
+                olMode === "assignment"
+                  ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
+                  : "border-[var(--color-border)] text-[var(--color-muted)]",
+              )}
+            >
+              Assignment
+            </button>
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain touch-pan-x">
             {DEF_FRONTS.map((f) => (
               <button
                 key={f.id}
@@ -1037,7 +1090,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                 className={cn(
                   "h-8 shrink-0 rounded-full border px-2.5 text-[10px] font-semibold",
                   frontId === f.id
-                    ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
+                    ? "border-transparent bg-[var(--color-fg)] text-[var(--color-bg)]"
                     : "border-[var(--color-border)] text-[var(--color-muted)]",
                 )}
               >
@@ -1059,112 +1112,162 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
 
       <div
         className={cn(
-          "flex w-full min-w-0 flex-wrap items-center gap-2",
+          "flex w-full min-w-0 flex-col gap-2",
           immersive &&
-            "mt-auto shrink-0 border-t border-[var(--color-border)] bg-[color-mix(in_oklab,var(--color-bg)_96%,transparent)] px-3 py-3 backdrop-blur-md",
+            "mt-auto shrink-0 border-t border-[var(--color-border)] bg-[color-mix(in_oklab,var(--color-bg)_97%,transparent)] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md",
         )}
       >
-        <Button
-          size="sm"
-          variant="secondary"
-          className="min-h-10 min-w-10 shrink-0"
-          onClick={() => goToPhase(0)}
-          aria-label="Restart"
+        <div
+          className={cn(
+            "flex w-full min-w-0 flex-wrap items-center gap-2",
+            immersive && "gap-1.5",
+          )}
         >
-          <RotateCcw className="size-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          className="min-h-10 min-w-10 shrink-0"
-          onClick={() => goToPhase(phaseIndex - 1)}
-          disabled={phaseIndex === 0}
-          aria-label="Previous phase"
-        >
-          <SkipBack className="size-4" />
-        </Button>
-        <Button
-          size="sm"
-          className="min-h-10 min-w-[5.5rem] shrink-0"
-          onClick={() => {
-            if (reducedMotion) {
-              goToPhase(phaseIndex >= play.phases.length - 1 ? 0 : phaseIndex + 1);
-              return;
-            }
-            if (progress >= 1 && phaseIndex >= simPlay.phases.length - 1) {
-              goToPhase(0);
-              setPlaying(true);
-              playingRef.current = true;
-              return;
-            }
-            setPlaying((p) => !p);
-          }}
-          aria-label={playing ? "Pause" : "Play"}
-        >
-          {playing ? <Pause className="size-4" /> : <PlayIcon className="size-4" />}
-          {playing ? "Pause" : "Play"}
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          className="min-h-10 min-w-10 shrink-0"
-          onClick={() => goToPhase(phaseIndex + 1)}
-          disabled={phaseIndex >= simPlay.phases.length - 1}
-          aria-label="Next phase"
-        >
-          <SkipForward className="size-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="min-h-10 shrink-0"
-          onClick={() => setSpeedIdx((s) => (s + 1) % SPEEDS.length)}
-        >
-          <FastForward className="size-4" />
-          {speed}×
-        </Button>
-      </div>
-
-      <div className="flex w-full min-w-0 gap-1.5">
-        {simPlay.phases.map((ph, i) => (
-          <button
-            key={ph.id}
-            type="button"
-            onClick={() => goToPhase(i)}
+          <Button
+            size="sm"
+            variant="secondary"
+            className={cn("shrink-0", immersive ? "h-9 min-h-9 min-w-9 px-0" : "min-h-10 min-w-10")}
+            onClick={() => goToPhase(0)}
+            aria-label="Restart"
+          >
+            <RotateCcw className="size-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            className={cn("shrink-0", immersive ? "h-9 min-h-9 min-w-9 px-0" : "min-h-10 min-w-10")}
+            onClick={() => goToPhase(phaseIndex - 1)}
+            disabled={phaseIndex === 0}
+            aria-label="Previous phase"
+          >
+            <SkipBack className="size-4" />
+          </Button>
+          <Button
+            size="sm"
             className={cn(
-              "h-2 min-w-0 flex-1 rounded-full transition-colors",
-              i < phaseIndex
-                ? "bg-[var(--color-primary)]"
-                : i === phaseIndex
-                  ? "bg-[color-mix(in_oklab,var(--color-primary)_55%,var(--color-border))]"
-                  : "bg-[var(--color-border)]",
+              "shrink-0",
+              immersive ? "h-9 min-h-9 min-w-[4.75rem] px-2" : "min-h-10 min-w-[5.5rem]",
             )}
-            aria-label={`Phase ${i + 1}: ${ph.title}`}
-          />
-        ))}
-      </div>
-
-      <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge>
-            Phase {phaseIndex + 1}/{play.phases.length}
-          </Badge>
-          <p className="min-w-0 font-display text-lg font-semibold tracking-tight">
-            {phase.title}
-          </p>
+            onClick={() => {
+              if (reducedMotion) {
+                goToPhase(
+                  phaseIndex >= simPlay.phases.length - 1 ? 0 : phaseIndex + 1,
+                );
+                return;
+              }
+              if (progress >= 1 && phaseIndex >= simPlay.phases.length - 1) {
+                goToPhase(0);
+                setPlaying(true);
+                playingRef.current = true;
+                return;
+              }
+              setPlaying((p) => !p);
+            }}
+            aria-label={playing ? "Pause" : "Play"}
+          >
+            {playing ? <Pause className="size-4" /> : <PlayIcon className="size-4" />}
+            {playing ? "Pause" : "Play"}
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            className={cn("shrink-0", immersive ? "h-9 min-h-9 min-w-9 px-0" : "min-h-10 min-w-10")}
+            onClick={() => goToPhase(phaseIndex + 1)}
+            disabled={phaseIndex >= simPlay.phases.length - 1}
+            aria-label="Next phase"
+          >
+            <SkipForward className="size-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className={cn("shrink-0", immersive ? "h-9 min-h-9 px-2" : "min-h-10")}
+            onClick={() => setSpeedIdx((s) => (s + 1) % SPEEDS.length)}
+          >
+            <FastForward className="size-4" />
+            {speed}×
+          </Button>
+          {immersive && (
+            <Button
+              size="sm"
+              variant={showPhasePanel ? "secondary" : "outline"}
+              className="ml-auto h-9 min-h-9 shrink-0 px-2.5"
+              onClick={() => setShowPhasePanel((v) => !v)}
+              aria-expanded={showPhasePanel}
+              aria-label={showPhasePanel ? "Hide phase notes" : "Show phase notes"}
+            >
+              {showPhasePanel ? (
+                <ChevronDown className="size-4" />
+              ) : (
+                <ChevronUp className="size-4" />
+              )}
+              Notes
+            </Button>
+          )}
         </div>
-        <p className="mt-2 text-sm leading-relaxed text-[var(--color-muted)]">
-          {phase.explanation}
-        </p>
-        <ul className="mt-3 space-y-1.5">
-          {phase.coachingPoints.map((c) => (
-            <li key={c} className="flex gap-2 text-sm text-[var(--color-fg)]">
-              <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--color-primary)]" />
-              <span className="min-w-0">{c}</span>
-            </li>
+
+        <div className={cn("flex w-full min-w-0 gap-1.5", immersive && "px-0.5")}>
+          {simPlay.phases.map((ph, i) => (
+            <button
+              key={ph.id}
+              type="button"
+              onClick={() => goToPhase(i)}
+              className={cn(
+                "min-w-0 flex-1 rounded-full transition-colors",
+                immersive ? "h-1.5" : "h-2",
+                i < phaseIndex
+                  ? "bg-[var(--color-primary)]"
+                  : i === phaseIndex
+                    ? "bg-[color-mix(in_oklab,var(--color-primary)_55%,var(--color-border))]"
+                    : "bg-[var(--color-border)]",
+              )}
+              aria-label={`Phase ${i + 1}: ${ph.title}`}
+            />
           ))}
-        </ul>
-      </section>
+        </div>
+
+        {/* Compact phase title always visible in immersive; full text expands */}
+        {immersive && !showPhasePanel && (
+          <p className="truncate px-0.5 text-center text-[11px] font-medium text-[var(--color-muted)]">
+            <span className="text-[var(--color-subtle)]">
+              {phaseIndex + 1}/{simPlay.phases.length}
+            </span>
+            {" · "}
+            {phase.title}
+            <span className="text-[var(--color-subtle)]"> · tap Notes</span>
+          </p>
+        )}
+
+        {(!immersive || showPhasePanel) && (
+          <section
+            className={cn(
+              "rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4",
+              immersive &&
+                "max-h-[38dvh] overflow-y-auto rounded-[var(--radius-lg)] p-3",
+            )}
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge>
+                Phase {phaseIndex + 1}/{simPlay.phases.length}
+              </Badge>
+              <p className="min-w-0 font-display text-lg font-semibold tracking-tight">
+                {phase.title}
+              </p>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--color-muted)]">
+              {phase.explanation}
+            </p>
+            <ul className="mt-3 space-y-1.5">
+              {phase.coachingPoints.map((c) => (
+                <li key={c} className="flex gap-2 text-sm text-[var(--color-fg)]">
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--color-primary)]" />
+                  <span className="min-w-0">{c}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
       </div>
 
       {!immersive && (
