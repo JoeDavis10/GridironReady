@@ -28,6 +28,7 @@ import {
   LOS_Y,
   buildSimPlay,
   getAssignmentReport,
+  classifyDefender,
   type DefFrontId,
 } from "@/data/play-looks";
 import {
@@ -36,7 +37,6 @@ import {
   hitboxOffense,
   sampleBlockPhysics,
 } from "@/lib/block-physics";
-import { classifyDefender } from "@/data/play-looks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
