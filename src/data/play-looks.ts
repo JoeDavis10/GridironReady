@@ -233,101 +233,242 @@ function movePath(def: LookDefender, x: number, y: number): LookDefender {
 
 /**
  * Build raw front alignments.
- * Depths: DL ~1 yd, LB 5 yd. Laterals keyed to OL landmarks (3.5 yd splits).
+ * Depths: DL ~1 yd, LB 5 yd.
+ *
+ * Gap landmarks (offense right = strength for Over/Under teaching):
+ *   weak C  LT–LG mid · weak B  LG–C mid (often called weak A/B by school)
+ *   A gaps   either side of C · strong B  RG–RT mid · strong C  RT–Y mid
+ *
+ * LB gap fits (standard teaching):
+ *   Will → weakside B/C (flow weak)
+ *   Mike → A gaps / ball (flow to call)
+ *   Sam  → strong C/D (TE / force)
  */
 export function buildFrontAlignments(frontId: DefFrontId): LookDefender[] {
-  // Landmarks from OL_X (keep in sync)
-  const LT = 43;
-  const LG = 46.5;
-  const C = 50;
-  const RG = 53.5;
-  const RT = 57;
-  const Y = 61;
+  // OL landmarks (keep in sync with OL_X)
+  const LT = OL_X.lt!;
+  const LG = OL_X.lg!;
+  const C = OL_X.c!;
+  const RG = OL_X.rg!;
+  const RT = OL_X.rt!;
+  const Y = OL_X.y!;
+
+  // Named gap centers (1 unit = 1 yard)
+  const GAP = {
+    weakC: (LT + LG) / 2, // ~44.8 — LT–LG
+    weakB: (LG + C) / 2, // ~48.3 — LG–C (weak A/B bubble)
+    strongA: (C + RG) / 2, // ~51.8 — C–RG
+    strongB: (RG + RT) / 2, // ~55.3 — RG–RT
+    strongC: (RT + Y) / 2, // ~59.0 — RT–Y/TE
+    weakD: LT - 3.5, // outside LT
+    strongD: Y + 2.5, // outside TE
+  } as const;
+
   const fs = d("look-fs", "FS", "Free safety", [50, 34], "Deep middle · 16 yd");
-  const ss = d("look-ss", "SS", "Strong safety", [60, 38], "Box / alley · 12 yd");
-  const cbL = d("look-cb-l", "CB", "LCB", [18, 48], "Boundary corner · 2 yd");
-  const cbR = d("look-cb-r", "CB", "RCB", [82, 48], "Field corner · 2 yd");
+  const ss = d("look-ss", "SS", "Strong safety", [GAP.strongC + 1, 38], "Box / alley · 12 yd");
+  const cbL = d("look-cb-l", "CB", "LCB", [OL_X.x!, 48], "Boundary corner · 2 yd");
+  const cbR = d("look-cb-r", "CB", "RCB", [OL_X.z!, 48], "Field corner · 2 yd");
   const lb = LB_Y;
 
   if (frontId === "custom" || frontId === "43-over") {
-    // Over: shade weak A + 3-tech strong B
+    // Over (strong right): shade weak A, 3-tech strong B
+    // Will — weak B (LG–C); Mike — ball/strong A; Sam — strong C (TE)
     return [
-      d("look-de-l", "E", "LE", [LT - 2.5, DL_Y], "Weak 5-tech · outside LT"),
+      d("look-de-l", "E", "LE", [LT - 2.5, DL_Y], "Weak 5-tech · C-gap edge"),
       d("look-dt-l", "N", "1-tech / shade", [C - 1.5, DL_Y], "Weak A shade"),
-      d("look-dt-r", "T", "3-tech", [RG + 1.2, DL_Y], "Strong 3-tech · outside RG"),
-      d("look-de-r", "E", "RE", [RT + 2.5, DL_Y], "Strong 5-tech · outside RT"),
-      d("look-will", "W", "Will", [LG - 1, lb], "Weak LB · 5 yd"),
-      d("look-mike", "M", "Mike", [C, lb], "Mike · 5 yd"),
-      d("look-sam", "S", "Sam", [RT, lb], "Sam · 5 yd"),
+      d("look-dt-r", "T", "3-tech", [RG + 1.2, DL_Y], "Strong B 3-tech"),
+      d("look-de-r", "E", "RE", [RT + 2.5, DL_Y], "Strong 5-tech · C-gap edge"),
+      d(
+        "look-will",
+        "W",
+        "Will",
+        [GAP.weakB, lb],
+        `Will · weak B (LG–C) · 5 yd — scrape weak flow`,
+      ),
+      d(
+        "look-mike",
+        "M",
+        "Mike",
+        [GAP.strongA, lb],
+        `Mike · strong A (C–RG) · 5 yd — ball / both A on flow`,
+      ),
+      d(
+        "look-sam",
+        "S",
+        "Sam",
+        [GAP.strongC, lb],
+        `Sam · strong C (RT–TE) · 5 yd — TE / force`,
+      ),
       fs, ss, cbL, cbR,
     ];
   }
 
   if (frontId === "43-under") {
+    // Under: 3-tech weak B, shade strong A — LBs mirror bubble
+    // Will — weak C/B (wider); Mike — weak A / ball; Sam — strong B/C
     return [
-      d("look-de-l", "E", "LE", [LT - 2.5, DL_Y], "Weak end"),
-      d("look-dt-l", "T", "3-tech (weak)", [LG - 1.2, DL_Y], "Weak 3-tech"),
-      d("look-dt-r", "N", "1-tech / shade", [C + 1.5, DL_Y], "Strong shade"),
-      d("look-de-r", "E", "RE", [RT + 2.5, DL_Y], "Strong end"),
-      d("look-will", "W", "Will", [LT, lb], "Will · 5 yd"),
-      d("look-mike", "M", "Mike", [C, lb], "Mike · 5 yd"),
-      d("look-sam", "S", "Sam", [RT + 1, lb], "Sam · 5 yd"),
+      d("look-de-l", "E", "LE", [LT - 2.5, DL_Y], "Weak 5-tech"),
+      d("look-dt-l", "T", "3-tech (weak)", [LG - 1.2, DL_Y], "Weak B 3-tech"),
+      d("look-dt-r", "N", "1-tech / shade", [C + 1.5, DL_Y], "Strong A shade"),
+      d("look-de-r", "E", "RE", [RT + 2.5, DL_Y], "Strong 5-tech"),
+      d(
+        "look-will",
+        "W",
+        "Will",
+        [GAP.weakC, lb],
+        `Will · weak C (LT–LG) · 5 yd — weak flow / C-gap`,
+      ),
+      d(
+        "look-mike",
+        "M",
+        "Mike",
+        [GAP.weakB, lb],
+        `Mike · weak A/B (LG–C) · 5 yd — ball side of shade`,
+      ),
+      d(
+        "look-sam",
+        "S",
+        "Sam",
+        [GAP.strongB, lb],
+        `Sam · strong B (RG–RT) · 5 yd — strong flow / TE help`,
+      ),
       fs, ss, cbL, cbR,
     ];
   }
 
   if (frontId === "52") {
+    // Odd front: ILBs over B gaps, Sam force outside TE
     return [
-      d("look-de-l", "E", "LE", [LT - 4, DL_Y], "Wide end"),
-      d("look-dt-l", "T", "DT", [LG - 1, DL_Y], "Down tackle"),
-      d("look-dt-r", "N", "Nose", [C, DL_Y], "0-tech nose"),
-      d("look-de-r", "T", "DT", [RG + 1, DL_Y], "Down tackle"),
-      d("look-edge-r", "E", "RE", [Y + 2, DL_Y], "Wide end"),
-      d("look-will", "W", "ILB", [LG, lb], "ILB weak · 5 yd"),
-      d("look-mike", "M", "ILB", [RG, lb], "ILB strong · 5 yd"),
-      d("look-sam", "S", "OLB", [Y + 4, lb], "Force OLB · 5 yd"),
+      d("look-de-l", "E", "LE", [LT - 4, DL_Y], "Wide end · D-gap"),
+      d("look-dt-l", "T", "DT", [LG - 1, DL_Y], "Weak B down"),
+      d("look-dt-r", "N", "Nose", [C, DL_Y], "0-tech · both A"),
+      d("look-de-r", "T", "DT", [RG + 1, DL_Y], "Strong B down"),
+      d("look-edge-r", "E", "RE", [Y + 2, DL_Y], "Wide end · D-gap"),
+      d(
+        "look-will",
+        "W",
+        "ILB",
+        [GAP.weakB, lb],
+        `ILB · weak B (LG–C) · 5 yd`,
+      ),
+      d(
+        "look-mike",
+        "M",
+        "ILB",
+        [GAP.strongB, lb],
+        `ILB · strong B (RG–RT) · 5 yd`,
+      ),
+      d(
+        "look-sam",
+        "S",
+        "OLB",
+        [GAP.strongD, lb],
+        `OLB · strong D (outside TE) · 5 yd — force`,
+      ),
       fs, ss, cbL, cbR,
     ];
   }
 
   if (frontId === "34") {
+    // Two ILBs in A gaps; Will/Sam as OLBs in C/D
     return [
-      d("look-de-l", "E", "LE", [LT, DL_Y], "5-tech end"),
+      d("look-de-l", "E", "LE", [LT, DL_Y], "5-tech · weak C"),
       d("look-dt-l", "N", "Nose", [C, DL_Y], "0-tech nose"),
-      d("look-de-r", "E", "RE", [RT, DL_Y], "5-tech end"),
-      d("look-will", "W", "Will", [LT - 3, lb], "OLB weak · 5 yd"),
-      d("look-mike", "M", "Mike", [C - 2.5, lb], "ILB · 5 yd"),
-      d("look-mike-r", "M", "Mo", [C + 2.5, lb], "ILB · 5 yd"),
-      d("look-sam", "S", "Sam", [RT + 3, lb], "OLB strong · 5 yd"),
+      d("look-de-r", "E", "RE", [RT, DL_Y], "5-tech · strong C"),
+      d(
+        "look-will",
+        "W",
+        "Will",
+        [GAP.weakD + 1, lb],
+        `Will · weak D/C · 5 yd — OLB contain`,
+      ),
+      d(
+        "look-mike",
+        "M",
+        "Mike",
+        [GAP.weakB, lb],
+        `Mike · weak A (LG–C) · 5 yd — ILB`,
+      ),
+      d(
+        "look-mike-r",
+        "M",
+        "Mo",
+        [GAP.strongA, lb],
+        `Mo · strong A (C–RG) · 5 yd — ILB`,
+      ),
+      d(
+        "look-sam",
+        "S",
+        "Sam",
+        [GAP.strongD - 1, lb],
+        `Sam · strong D/C · 5 yd — OLB force`,
+      ),
       fs, ss, cbL, cbR,
     ];
   }
 
   if (frontId === "bear") {
+    // 5-0 under center: LBs in B–C after front clogs A
     return [
-      d("look-de-l", "E", "LE", [LT - 2, DL_Y], "Tight end"),
-      d("look-dt-l", "T", "DT", [LG - 0.5, DL_Y], "3-tech"),
+      d("look-de-l", "E", "LE", [LT - 2, DL_Y], "Tight end · C"),
+      d("look-dt-l", "T", "DT", [LG - 0.5, DL_Y], "Weak B/3"),
       d("look-dt-r", "N", "Nose", [C, DL_Y], "0-tech"),
-      d("look-de-r", "T", "DT", [RG + 0.5, DL_Y], "3-tech"),
-      d("look-edge-r", "E", "RE", [RT + 2, DL_Y], "Tight end"),
-      d("look-will", "W", "LB", [LT + 1, lb], "LB · 5 yd"),
-      d("look-mike", "M", "LB", [C, lb], "LB · 5 yd"),
-      d("look-sam", "S", "LB", [RT - 1, lb], "LB · 5 yd"),
+      d("look-de-r", "T", "DT", [RG + 0.5, DL_Y], "Strong B/3"),
+      d("look-edge-r", "E", "RE", [RT + 2, DL_Y], "Tight end · C"),
+      d(
+        "look-will",
+        "W",
+        "LB",
+        [GAP.weakC, lb],
+        `Will · weak C (LT–LG) · 5 yd`,
+      ),
+      d(
+        "look-mike",
+        "M",
+        "LB",
+        [C, lb],
+        `Mike · A / ball · 5 yd — behind nose`,
+      ),
+      d(
+        "look-sam",
+        "S",
+        "LB",
+        [GAP.strongC, lb],
+        `Sam · strong C (RT–TE) · 5 yd`,
+      ),
       fs,
-      d("look-ss", "SS", "SS", [RG + 4, 36], "Alley · 14 yd"),
+      d("look-ss", "SS", "SS", [GAP.strongC + 2, 36], "Alley · 14 yd"),
       cbL, cbR,
     ];
   }
 
-  // 3-3 stack — LBs stacked 5 yd off over the front
+  // 3-3 stack — stack LBs over front-side gaps they fit
   return [
-    d("look-de-l", "E", "LE", [LT - 1.5, DL_Y], "End"),
-    d("look-dt-l", "N", "Nose", [C, DL_Y], "Nose"),
-    d("look-de-r", "E", "RE", [RT + 1.5, DL_Y], "End"),
-    d("look-will", "W", "Stack W", [LT - 1.5, lb], "Stacked · 5 yd"),
-    d("look-mike", "M", "Stack M", [C, lb], "Stacked · 5 yd"),
-    d("look-sam", "S", "Stack S", [RT + 1.5, lb], "Stacked · 5 yd"),
-    d("look-ss", "SS", "Apex", [Y + 2, 40], "Apex / force · 10 yd"),
+    d("look-de-l", "E", "LE", [LT - 1.5, DL_Y], "End · weak C/B"),
+    d("look-dt-l", "N", "Nose", [C, DL_Y], "Nose · A"),
+    d("look-de-r", "E", "RE", [RT + 1.5, DL_Y], "End · strong C/B"),
+    d(
+      "look-will",
+      "W",
+      "Stack W",
+      [GAP.weakB, lb],
+      `Stack Will · weak B · 5 yd — stacked over weak front`,
+    ),
+    d(
+      "look-mike",
+      "M",
+      "Stack M",
+      [C, lb],
+      `Stack Mike · A / ball · 5 yd — stacked on nose`,
+    ),
+    d(
+      "look-sam",
+      "S",
+      "Stack S",
+      [GAP.strongB, lb],
+      `Stack Sam · strong B · 5 yd — stacked over strong front`,
+    ),
+    d("look-ss", "SS", "Apex", [GAP.strongC + 2, 40], "Apex / force · 10 yd"),
     fs, cbL, cbR,
     d("look-nick-r", "NB", "Nickel", [Y + 4, 48], "Slot nickel — not DL"),
   ];
