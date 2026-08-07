@@ -129,6 +129,8 @@ export const LOS_Y = 50;
 export const LB_DEPTH = 4; // yards off LOS
 export const DL_Y = 49;
 export const LB_Y = LOS_Y - LB_DEPTH; // 46
+/** Lead blockers (pullers / FB) finish at least this deep — matches typical HB finish */
+export const LEAD_FINISH_Y = 30;
 
 export type SchemeIdOrNull = SchemeId | null;
 
@@ -889,8 +891,11 @@ export function evaluateAssignments(
     const mid = lerpPt(from, t, 0.4);
     mid[1] = Math.min(mid[1], from[1] - 1.2);
     const near: FieldPoint = [t[0], Math.min(t[1] + 0.5, mid[1] - 0.5)];
-    const end: FieldPoint = [t[0], Math.min(t[1] - 0.8, near[1] - 0.8)];
-    return cleanPath([from, mid, near, end]);
+    const contact: FieldPoint = [t[0], Math.min(t[1] - 0.8, near[1] - 0.8)];
+    // Lead continues past the LB at least to HB depth
+    const past: FieldPoint = [t[0], Math.min(contact[1] - 4, LEAD_FINISH_Y + 4)];
+    const deep: FieldPoint = [t[0], LEAD_FINISH_Y];
+    return cleanPath([from, mid, near, contact, past, deep]);
   }
 
   function pathPull(
@@ -899,7 +904,7 @@ export function evaluateAssignments(
     _psDir: "L" | "R",
   ): FieldPoint[] {
     const toward = target[0] > from[0] ? 1 : -1;
-    // Flat pull: open step → skip across → turn up into target — always progressing
+    // Flat pull → kick/wrap → keep running to HB depth (full sim)
     const open: FieldPoint = [from[0] + toward * 2.5, from[1] - 0.15];
     const skip: FieldPoint = [
       from[0] + (target[0] - from[0]) * 0.55,
@@ -910,7 +915,12 @@ export function evaluateAssignments(
       Math.min(target[1] + 1.2, from[1] - 0.6),
     ];
     const kick: FieldPoint = [target[0], Math.min(target[1] - 1.2, turn[1] - 1)];
-    return cleanPath([from, open, skip, turn, kick]);
+    const through: FieldPoint = [
+      target[0] + toward * 0.4,
+      Math.min(kick[1] - 5, (kick[1] + LEAD_FINISH_Y) / 2),
+    ];
+    const deep: FieldPoint = [target[0] + toward * 0.6, LEAD_FINISH_Y];
+    return cleanPath([from, open, skip, turn, kick, through, deep]);
   }
 
   function pathReach(from: FieldPoint, to: FieldPoint, dir: number): FieldPoint[] {
@@ -1706,6 +1716,13 @@ export function evaluateAssignments(
   // Attach drive paths: desired angle of displacement for each engaged defender
   attachDrivePaths(defs, scheme, ps, roleMap);
 
+  // Lead blockers (pull / FB lead) must run at least to HB depth for full sim
+  for (const ra of roleMap.values()) {
+    if (ra.rule === "pull" || ra.rule === "lead") {
+      ra.path = extendLeadPath(ra.path, LEAD_FINISH_Y);
+    }
+  }
+
   return {
     scheme,
     schemeUsesGod: godScheme,
@@ -1814,6 +1831,57 @@ function attachDrivePaths(
       ra.path = cleanRolePath(ra.path);
     }
   }
+}
+
+
+/** Continue a lead/pull path downfield to at least finishY (HB depth). */
+export function extendLeadPath(
+  pts: FieldPoint[],
+  finishY: number,
+): FieldPoint[] {
+  if (!pts.length) return pts;
+  const path = cleanRolePath(pts);
+  const last = path[path.length - 1]!;
+  // Smaller y = further downfield. Already past target → done.
+  if (last[1] <= finishY + 0.25) return path;
+  const x = last[0];
+  const span = last[1] - finishY;
+  const mid1: FieldPoint = [x, last[1] - span * 0.38];
+  const mid2: FieldPoint = [
+    x + (x > 52 ? 0.6 : x < 48 ? -0.6 : 0),
+    last[1] - span * 0.72,
+  ];
+  const end: FieldPoint = [x, finishY];
+  return cleanRolePath([...path, mid1, mid2, end]);
+}
+
+export function isLeadBlockerRole(role: {
+  id?: string;
+  roleId?: string;
+  label?: string;
+  job?: string;
+  rule?: string;
+}): boolean {
+  if (role.rule === "pull" || role.rule === "lead") return true;
+  const id = (role.id ?? role.roleId ?? "").toLowerCase();
+  if (id === "fb") return true;
+  // Never treat ball-handlers / pure wall OL as leads
+  if (["qb", "rb", "c", "lt", "lg", "rg", "rt", "y", "x", "z"].includes(id)) {
+    const label = (role.label ?? "").toLowerCase();
+    const job = (role.job ?? "").toLowerCase();
+    // Explicit puller label or job that *is* the pull (not "get out of the puller's path")
+    if (/\bpull\b/.test(label)) return true;
+    if (
+      /^(pull|flat pull|only puller|first puller|second puller)/.test(job) ||
+      /^pull flat/.test(job) ||
+      /only puller on this call/.test(job)
+    ) {
+      return true;
+    }
+    return false;
+  }
+  const blob = `${role.label ?? ""} ${role.job ?? ""}`.toLowerCase();
+  return /\bpull\b|\blead block|\blead with/.test(blob);
 }
 
 /** Module-level path cleaner for assignment paths after scheme overlays. */
@@ -2031,6 +2099,16 @@ export function buildSimPlay(
       return { ...r, path, job: jobs[r.id] ?? r.job };
     });
   }
+
+  // Lead blockers run at least as far as the HB for the full simulation
+  const rb = play.roles.find((r) => r.id === "rb");
+  const rbEndY = rb?.path[rb.path.length - 1]?.[1] ?? LEAD_FINISH_Y;
+  // At least as far as HB (smaller y) and not shallower than LEAD_FINISH_Y
+  const leadFinishY = Math.min(rbEndY, LEAD_FINISH_Y);
+  roles = roles.map((r) => {
+    if (!isLeadBlockerRole(r)) return r;
+    return { ...r, path: extendLeadPath(r.path, leadFinishY) };
+  });
 
   return {
     ...play,
