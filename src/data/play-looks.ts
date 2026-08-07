@@ -4,7 +4,7 @@ import type { FieldPoint, Play, PlayPhase, PlayRole } from "./plays";
  * Defensive looks + Gap-On-Down (GOD) assignment detector.
  *
  * Field: LOS at y=50. Offense y>50, defense y<50. ~1 unit ≈ 1 yard near LOS.
- * LBs default 4 yards off the ball (y = 46).
+ * LBs default 5 yards off the ball (y = 45).
  */
 
 export interface LookDefender {
@@ -130,9 +130,9 @@ export interface AssignmentReport {
  * LOS at y=50; offense y>50; defense y<50.
  */
 export const LOS_Y = 50;
-export const LB_DEPTH = 4; // yards off LOS (standard LB depth)
+export const LB_DEPTH = 5; // yards off LOS (standard LB depth)
 export const DL_Y = 49; // ~1 yd off ball (3-point stance)
-export const LB_Y = LOS_Y - LB_DEPTH; // 46
+export const LB_Y = LOS_Y - LB_DEPTH; // 45
 /** OL helmet line — ~1 yard behind LOS (not 2) */
 export const OL_DEPTH = 1;
 /** Lead blockers (pullers / FB) finish at least this deep — matches typical HB finish */
@@ -233,7 +233,7 @@ function movePath(def: LookDefender, x: number, y: number): LookDefender {
 
 /**
  * Build raw front alignments.
- * Depths: DL ~1 yd, LB 4 yd. Laterals keyed to OL landmarks (3.5 yd splits).
+ * Depths: DL ~1 yd, LB 5 yd. Laterals keyed to OL landmarks (3.5 yd splits).
  */
 export function buildFrontAlignments(frontId: DefFrontId): LookDefender[] {
   // Landmarks from OL_X (keep in sync)
@@ -256,9 +256,9 @@ export function buildFrontAlignments(frontId: DefFrontId): LookDefender[] {
       d("look-dt-l", "N", "1-tech / shade", [C - 1.5, DL_Y], "Weak A shade"),
       d("look-dt-r", "T", "3-tech", [RG + 1.2, DL_Y], "Strong 3-tech · outside RG"),
       d("look-de-r", "E", "RE", [RT + 2.5, DL_Y], "Strong 5-tech · outside RT"),
-      d("look-will", "W", "Will", [LG - 1, lb], "Weak LB · 4 yd"),
-      d("look-mike", "M", "Mike", [C, lb], "Mike · 4 yd"),
-      d("look-sam", "S", "Sam", [RT, lb], "Sam · 4 yd"),
+      d("look-will", "W", "Will", [LG - 1, lb], "Weak LB · 5 yd"),
+      d("look-mike", "M", "Mike", [C, lb], "Mike · 5 yd"),
+      d("look-sam", "S", "Sam", [RT, lb], "Sam · 5 yd"),
       fs, ss, cbL, cbR,
     ];
   }
@@ -269,9 +269,9 @@ export function buildFrontAlignments(frontId: DefFrontId): LookDefender[] {
       d("look-dt-l", "T", "3-tech (weak)", [LG - 1.2, DL_Y], "Weak 3-tech"),
       d("look-dt-r", "N", "1-tech / shade", [C + 1.5, DL_Y], "Strong shade"),
       d("look-de-r", "E", "RE", [RT + 2.5, DL_Y], "Strong end"),
-      d("look-will", "W", "Will", [LT, lb], "Will · 4 yd"),
-      d("look-mike", "M", "Mike", [C, lb], "Mike · 4 yd"),
-      d("look-sam", "S", "Sam", [RT + 1, lb], "Sam · 4 yd"),
+      d("look-will", "W", "Will", [LT, lb], "Will · 5 yd"),
+      d("look-mike", "M", "Mike", [C, lb], "Mike · 5 yd"),
+      d("look-sam", "S", "Sam", [RT + 1, lb], "Sam · 5 yd"),
       fs, ss, cbL, cbR,
     ];
   }
@@ -283,9 +283,9 @@ export function buildFrontAlignments(frontId: DefFrontId): LookDefender[] {
       d("look-dt-r", "N", "Nose", [C, DL_Y], "0-tech nose"),
       d("look-de-r", "T", "DT", [RG + 1, DL_Y], "Down tackle"),
       d("look-edge-r", "E", "RE", [Y + 2, DL_Y], "Wide end"),
-      d("look-will", "W", "ILB", [LG, lb], "ILB weak · 4 yd"),
-      d("look-mike", "M", "ILB", [RG, lb], "ILB strong · 4 yd"),
-      d("look-sam", "S", "OLB", [Y + 4, lb], "Force OLB · 4 yd"),
+      d("look-will", "W", "ILB", [LG, lb], "ILB weak · 5 yd"),
+      d("look-mike", "M", "ILB", [RG, lb], "ILB strong · 5 yd"),
+      d("look-sam", "S", "OLB", [Y + 4, lb], "Force OLB · 5 yd"),
       fs, ss, cbL, cbR,
     ];
   }
@@ -295,10 +295,10 @@ export function buildFrontAlignments(frontId: DefFrontId): LookDefender[] {
       d("look-de-l", "E", "LE", [LT, DL_Y], "5-tech end"),
       d("look-dt-l", "N", "Nose", [C, DL_Y], "0-tech nose"),
       d("look-de-r", "E", "RE", [RT, DL_Y], "5-tech end"),
-      d("look-will", "W", "Will", [LT - 3, lb], "OLB weak · 4 yd"),
-      d("look-mike", "M", "Mike", [C - 2.5, lb], "ILB · 4 yd"),
-      d("look-mike-r", "M", "Mo", [C + 2.5, lb], "ILB · 4 yd"),
-      d("look-sam", "S", "Sam", [RT + 3, lb], "OLB strong · 4 yd"),
+      d("look-will", "W", "Will", [LT - 3, lb], "OLB weak · 5 yd"),
+      d("look-mike", "M", "Mike", [C - 2.5, lb], "ILB · 5 yd"),
+      d("look-mike-r", "M", "Mo", [C + 2.5, lb], "ILB · 5 yd"),
+      d("look-sam", "S", "Sam", [RT + 3, lb], "OLB strong · 5 yd"),
       fs, ss, cbL, cbR,
     ];
   }
@@ -310,23 +310,23 @@ export function buildFrontAlignments(frontId: DefFrontId): LookDefender[] {
       d("look-dt-r", "N", "Nose", [C, DL_Y], "0-tech"),
       d("look-de-r", "T", "DT", [RG + 0.5, DL_Y], "3-tech"),
       d("look-edge-r", "E", "RE", [RT + 2, DL_Y], "Tight end"),
-      d("look-will", "W", "LB", [LT + 1, lb], "LB · 4 yd"),
-      d("look-mike", "M", "LB", [C, lb], "LB · 4 yd"),
-      d("look-sam", "S", "LB", [RT - 1, lb], "LB · 4 yd"),
+      d("look-will", "W", "LB", [LT + 1, lb], "LB · 5 yd"),
+      d("look-mike", "M", "LB", [C, lb], "LB · 5 yd"),
+      d("look-sam", "S", "LB", [RT - 1, lb], "LB · 5 yd"),
       fs,
       d("look-ss", "SS", "SS", [RG + 4, 36], "Alley · 14 yd"),
       cbL, cbR,
     ];
   }
 
-  // 3-3 stack — LBs stacked 4 yd off over the front
+  // 3-3 stack — LBs stacked 5 yd off over the front
   return [
     d("look-de-l", "E", "LE", [LT - 1.5, DL_Y], "End"),
     d("look-dt-l", "N", "Nose", [C, DL_Y], "Nose"),
     d("look-de-r", "E", "RE", [RT + 1.5, DL_Y], "End"),
-    d("look-will", "W", "Stack W", [LT - 1.5, lb], "Stacked · 4 yd"),
-    d("look-mike", "M", "Stack M", [C, lb], "Stacked · 4 yd"),
-    d("look-sam", "S", "Stack S", [RT + 1.5, lb], "Stacked · 4 yd"),
+    d("look-will", "W", "Stack W", [LT - 1.5, lb], "Stacked · 5 yd"),
+    d("look-mike", "M", "Stack M", [C, lb], "Stacked · 5 yd"),
+    d("look-sam", "S", "Stack S", [RT + 1.5, lb], "Stacked · 5 yd"),
     d("look-ss", "SS", "Apex", [Y + 2, 40], "Apex / force · 10 yd"),
     fs, cbL, cbR,
     d("look-nick-r", "NB", "Nickel", [Y + 4, 48], "Slot nickel — not DL"),

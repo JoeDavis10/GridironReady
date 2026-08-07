@@ -883,7 +883,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
             opacity={0.5}
           />
           <text x="8.5" y={LB_Y - 0.85} fill="var(--color-info)" fontSize={fontS(1.45)} fontFamily="var(--font-body)" opacity={0.75}>
-            LB · 4 yd
+            LB · 5 yd
           </text>
           <text x="50" y={LOS_Y + 1.85} textAnchor="middle" fill="var(--color-subtle)" fontSize={fontS(2.2)} fontFamily="var(--font-body)" fontWeight="600" opacity={0.8}>
             LOS · 0
