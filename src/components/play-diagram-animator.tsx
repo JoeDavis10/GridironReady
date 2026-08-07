@@ -1160,71 +1160,6 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
           </div>
         )}
 
-      {canSwitchFront && !immersive && (
-        <div className="w-full max-w-full min-w-0 space-y-3">
-          <div className="flex w-full min-w-0 flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setOlMode("generic")}
-              className={cn(
-                "h-10 min-w-0 flex-1 rounded-[var(--radius-md)] border px-3 text-xs font-semibold touch-manipulation",
-                olMode === "generic"
-                  ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
-                  : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]",
-              )}
-            >
-              Generic paths
-            </button>
-            <button
-              type="button"
-              onClick={() => setOlMode("assignment")}
-              className={cn(
-                "h-10 min-w-0 flex-1 rounded-[var(--radius-md)] border px-3 text-xs font-semibold touch-manipulation",
-                olMode === "assignment"
-                  ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
-                  : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]",
-              )}
-            >
-              Blocking assignment
-            </button>
-          </div>
-          <div className="w-full max-w-full min-w-0">
-            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--color-subtle)]">
-              Defensive front
-            </p>
-            <div className="flex w-full min-w-0 gap-2 overflow-x-auto overscroll-x-contain touch-pan-x pb-1 [scrollbar-width:thin]">
-              {DEF_FRONTS.map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => {
-                    if (f.id === "custom") setCustomPos({});
-                    setFrontId(f.id);
-                    setFocusLookId(null);
-                    goToPhase(0);
-                  }}
-                  className={cn(
-                    "h-10 shrink-0 snap-start rounded-full border px-3.5 text-xs font-semibold touch-manipulation",
-                    frontId === f.id
-                      ? "border-transparent bg-[var(--color-fg)] text-[var(--color-bg)]"
-                      : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]",
-                  )}
-                  title={f.blurb}
-                >
-                  {f.short}
-                </button>
-              ))}
-            </div>
-            <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--color-subtle)]">
-              {DEF_FRONTS.find((f) => f.id === frontId)?.blurb}
-              {olMode === "assignment"
-                ? " · OL tracks recompute to this front."
-                : " · Showing install movement lines."}
-            </p>
-          </div>
-        </div>
-      )}
-
       {canSwitchFront && immersive && showImmersiveOpts && (
         <div className="shrink-0 space-y-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-2">
           <div className="flex gap-1.5">
@@ -1277,169 +1212,15 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
         </div>
       )}
 
-      {hasLook && simPlay.lookNote && showLook && !immersive && (
-        <div className="space-y-2">
-          <p className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs leading-relaxed text-[var(--color-muted)]">
-            <span className="font-semibold text-[var(--color-fg)]">
-              {assignReport?.schemeUsesGod ? "GOD ON · " : "GOD limited · "}
-            </span>
-            {simPlay.lookNote}
-          </p>
-          {customMode && (
-            <p className="rounded-[var(--radius-lg)] border border-[color-mix(in_oklab,var(--color-primary)_40%,var(--color-border))] bg-[color-mix(in_oklab,var(--color-primary-dim)_35%,var(--color-surface))] px-3 py-2 text-xs leading-relaxed text-[var(--color-fg)]">
-              <span className="font-semibold text-[var(--color-primary)]">Custom front: </span>
-              Drag any diamond. Gaps and every OL assignment recompute live.
-              <button type="button" className="ml-2 font-semibold underline" onClick={() => setCustomPos({})}>
-                Reset alignment
-              </button>
-            </p>
-          )}
-          {assignReport && olMode === "assignment" && (
-            <div className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--color-subtle)]">
-                Player assignments · {assignReport.frontLabel}
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-[var(--color-muted)]">{assignReport.schemeNote}</p>
-              {assignReport.gaps.length > 0 && (
-                <p className="mt-2 text-[11px] text-[var(--color-subtle)]">
-                  Gaps: {assignReport.gaps.slice(0, 5).map((g) => g.label).join(" · ")}
-                </p>
-              )}
-              <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto overscroll-contain">
-                {(["lt", "lg", "c", "rg", "rt", "y", "fb"] as const).map((id) => {
-                  const r = assignReport.roles.find((x) => x.roleId === id);
-                  if (!r) return null;
-                  return (
-                    <li key={id} className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-elevated)] px-2.5 py-2">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="font-display text-sm font-semibold uppercase text-[var(--color-fg)]">{r.roleId}</span>
-                        <Badge variant={r.usesGod ? "default" : "outline"} className="text-[10px]">
-                          {r.usesGod ? "GOD" : "not GOD"}
-                        </Badge>
-                        <span className="text-[10px] uppercase tracking-wide text-[var(--color-subtle)]">{r.rule}</span>
-                        {r.targetTags.length > 0 && (
-                          <span className="text-[11px] text-[var(--color-primary)]">→ {r.targetTags.join("+")}</span>
-                        )}
-                      </div>
-                      <p className="mt-1 text-xs leading-relaxed text-[var(--color-muted)]">{r.why}</p>
-                      {r.whyNotGod && (
-                        <p className="mt-1 text-[11px] leading-relaxed text-[var(--color-subtle)]">Why not GOD: {r.whyNotGod}</p>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
 
       <div
         className={cn(
-          "flex w-full min-w-0 flex-col gap-2",
+          "flex w-full min-w-0 flex-col gap-2 border-t border-[var(--color-border)] px-3 py-3",
           immersive &&
             "mt-auto shrink-0 border-t border-[var(--color-border)] bg-[color-mix(in_oklab,var(--color-bg)_97%,transparent)] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md",
         )}
       >
-        <div className={cn("flex w-full min-w-0 flex-col gap-1.5", immersive && "gap-1")}>
-        <label
-          className={cn(
-            "flex w-full min-w-0 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5",
-            immersive && "py-1",
-          )}
-        >
-          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--color-subtle)]" title="Visual only — physics hitboxes stay fixed">
-            Size
-          </span>
-          <span
-            className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-[8px] font-bold text-[var(--color-primary-fg)]"
-            aria-hidden
-            style={{
-              transform: `scale(${0.65 + bubbleScale * 0.35})`,
-            }}
-          >
-            O
-          </span>
-          <input
-            type="range"
-            min={BUBBLE_SCALE_MIN}
-            max={BUBBLE_SCALE_MAX}
-            step={0.05}
-            value={bubbleScale}
-            onChange={(e) => setBubbleScale(Number(e.target.value))}
-            aria-label="Player bubble size"
-            className={cn(
-              "min-w-0 flex-1 cursor-pointer appearance-none bg-transparent",
-              "[&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-runnable-track]:rounded-full",
-              "[&::-webkit-slider-runnable-track]:bg-[var(--color-border-strong)]",
-              "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:mt-[-5px]",
-              "[&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full",
-              "[&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[var(--color-bg)]",
-              "[&::-webkit-slider-thumb]:bg-[var(--color-primary)]",
-              "[&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full",
-              "[&::-moz-range-track]:bg-[var(--color-border-strong)]",
-              "[&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full",
-              "[&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-[var(--color-primary)]",
-            )}
-          />
-          <span className="w-9 shrink-0 text-right text-[11px] font-semibold tabular-nums text-[var(--color-muted)]">
-            {Math.round(bubbleScale * 100)}%
-          </span>
-          <button
-            type="button"
-            onClick={() => setBubbleScale(BUBBLE_SCALE_DEFAULT)}
-            className="h-7 shrink-0 rounded-full border border-[var(--color-border)] px-2 text-[10px] font-semibold text-[var(--color-muted)] touch-manipulation disabled:opacity-40"
-            disabled={Math.abs(bubbleScale - BUBBLE_SCALE_DEFAULT) < 0.01}
-            aria-label="Reset bubble size"
-          >
-            Reset
-          </button>
-        </label>
-        <label
-          className={cn(
-            "flex w-full min-w-0 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5",
-            immersive && "py-1",
-          )}
-        >
-          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--color-subtle)]">
-            Zoom
-          </span>
-          <input
-            type="range"
-            min={1}
-            max={2.5}
-            step={0.05}
-            value={zoom}
-            onChange={(e) => setZoom(Number(e.target.value))}
-            aria-label="Diagram zoom"
-            className={cn(
-              "min-w-0 flex-1 cursor-pointer appearance-none bg-transparent",
-              "[&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-runnable-track]:rounded-full",
-              "[&::-webkit-slider-runnable-track]:bg-[var(--color-border-strong)]",
-              "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:mt-[-5px]",
-              "[&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full",
-              "[&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[var(--color-bg)]",
-              "[&::-webkit-slider-thumb]:bg-[var(--color-info)]",
-              "[&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full",
-              "[&::-moz-range-track]:bg-[var(--color-border-strong)]",
-              "[&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full",
-              "[&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-[var(--color-info)]",
-            )}
-          />
-          <span className="w-10 shrink-0 text-right text-[11px] font-semibold tabular-nums text-[var(--color-muted)]">
-            {zoom.toFixed(2)}×
-          </span>
-          <button
-            type="button"
-            onClick={() => setZoom(1)}
-            className="h-7 shrink-0 rounded-full border border-[var(--color-border)] px-2 text-[10px] font-semibold text-[var(--color-muted)] touch-manipulation disabled:opacity-40"
-            disabled={Math.abs(zoom - 1) < 0.01}
-            aria-label="Reset zoom"
-          >
-            Reset
-          </button>
-        </label>
-        </div>
+        {/* Transport — directly under the diagram */}
         <div
           className={cn(
             "flex w-full min-w-0 flex-wrap items-center gap-2",
@@ -1549,7 +1330,6 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
           ))}
         </div>
 
-        {/* Compact phase title always visible in immersive; full text expands */}
         {immersive && !showPhasePanel && (
           <p className="truncate px-0.5 text-center text-[11px] font-medium text-[var(--color-muted)]">
             <span className="text-[var(--color-subtle)]">
@@ -1590,8 +1370,236 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
             </ul>
           </section>
         )}
+
+        {/* Display tweaks — after transport + phases */}
+        <div className={cn("flex w-full min-w-0 flex-col gap-1.5", immersive && "gap-1")}>
+          <label
+            className={cn(
+              "flex w-full min-w-0 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5",
+              immersive && "py-1",
+            )}
+          >
+            <span
+              className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--color-subtle)]"
+              title="Visual only — physics hitboxes stay fixed"
+            >
+              Size
+            </span>
+            <span
+              className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-[8px] font-bold text-[var(--color-primary-fg)]"
+              aria-hidden
+              style={{
+                transform: `scale(${0.65 + bubbleScale * 0.35})`,
+              }}
+            >
+              O
+            </span>
+            <input
+              type="range"
+              min={BUBBLE_SCALE_MIN}
+              max={BUBBLE_SCALE_MAX}
+              step={0.05}
+              value={bubbleScale}
+              onChange={(e) => setBubbleScale(Number(e.target.value))}
+              aria-label="Player bubble size"
+              className={cn(
+                "min-w-0 flex-1 cursor-pointer appearance-none bg-transparent",
+                "[&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-runnable-track]:rounded-full",
+                "[&::-webkit-slider-runnable-track]:bg-[var(--color-border-strong)]",
+                "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:mt-[-5px]",
+                "[&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full",
+                "[&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[var(--color-bg)]",
+                "[&::-webkit-slider-thumb]:bg-[var(--color-primary)]",
+                "[&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full",
+                "[&::-moz-range-track]:bg-[var(--color-border-strong)]",
+                "[&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full",
+                "[&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-[var(--color-primary)]",
+              )}
+            />
+            <span className="w-9 shrink-0 text-right text-[11px] font-semibold tabular-nums text-[var(--color-muted)]">
+              {Math.round(bubbleScale * 100)}%
+            </span>
+            <button
+              type="button"
+              onClick={() => setBubbleScale(BUBBLE_SCALE_DEFAULT)}
+              className="h-7 shrink-0 rounded-full border border-[var(--color-border)] px-2 text-[10px] font-semibold text-[var(--color-muted)] touch-manipulation disabled:opacity-40"
+              disabled={Math.abs(bubbleScale - BUBBLE_SCALE_DEFAULT) < 0.01}
+              aria-label="Reset bubble size"
+            >
+              Reset
+            </button>
+          </label>
+          <label
+            className={cn(
+              "flex w-full min-w-0 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5",
+              immersive && "py-1",
+            )}
+          >
+            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--color-subtle)]">
+              Zoom
+            </span>
+            <input
+              type="range"
+              min={1}
+              max={2.5}
+              step={0.05}
+              value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+              aria-label="Diagram zoom"
+              className={cn(
+                "min-w-0 flex-1 cursor-pointer appearance-none bg-transparent",
+                "[&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-runnable-track]:rounded-full",
+                "[&::-webkit-slider-runnable-track]:bg-[var(--color-border-strong)]",
+                "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:mt-[-5px]",
+                "[&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full",
+                "[&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[var(--color-bg)]",
+                "[&::-webkit-slider-thumb]:bg-[var(--color-info)]",
+                "[&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full",
+                "[&::-moz-range-track]:bg-[var(--color-border-strong)]",
+                "[&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full",
+                "[&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-[var(--color-info)]",
+              )}
+            />
+            <span className="w-10 shrink-0 text-right text-[11px] font-semibold tabular-nums text-[var(--color-muted)]">
+              {zoom.toFixed(2)}×
+            </span>
+            <button
+              type="button"
+              onClick={() => setZoom(1)}
+              className="h-7 shrink-0 rounded-full border border-[var(--color-border)] px-2 text-[10px] font-semibold text-[var(--color-muted)] touch-manipulation disabled:opacity-40"
+              disabled={Math.abs(zoom - 1) < 0.01}
+              aria-label="Reset zoom"
+            >
+              Reset
+            </button>
+          </label>
+        </div>
       </div>
       </div>
+
+
+      {canSwitchFront && !immersive && (
+        <div className="w-full max-w-full min-w-0 space-y-3">
+          <div className="flex w-full min-w-0 flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setOlMode("generic")}
+              className={cn(
+                "h-10 min-w-0 flex-1 rounded-[var(--radius-md)] border px-3 text-xs font-semibold touch-manipulation",
+                olMode === "generic"
+                  ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
+                  : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]",
+              )}
+            >
+              Generic paths
+            </button>
+            <button
+              type="button"
+              onClick={() => setOlMode("assignment")}
+              className={cn(
+                "h-10 min-w-0 flex-1 rounded-[var(--radius-md)] border px-3 text-xs font-semibold touch-manipulation",
+                olMode === "assignment"
+                  ? "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
+                  : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]",
+              )}
+            >
+              Blocking assignment
+            </button>
+          </div>
+          <div className="w-full max-w-full min-w-0">
+            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--color-subtle)]">
+              Defensive front
+            </p>
+            <div className="flex w-full min-w-0 gap-2 overflow-x-auto overscroll-x-contain touch-pan-x pb-1 [scrollbar-width:thin]">
+              {DEF_FRONTS.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => {
+                    if (f.id === "custom") setCustomPos({});
+                    setFrontId(f.id);
+                    setFocusLookId(null);
+                    goToPhase(0);
+                  }}
+                  className={cn(
+                    "h-10 shrink-0 snap-start rounded-full border px-3.5 text-xs font-semibold touch-manipulation",
+                    frontId === f.id
+                      ? "border-transparent bg-[var(--color-fg)] text-[var(--color-bg)]"
+                      : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]",
+                  )}
+                  title={f.blurb}
+                >
+                  {f.short}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--color-subtle)]">
+              {DEF_FRONTS.find((f) => f.id === frontId)?.blurb}
+              {olMode === "assignment"
+                ? " · OL tracks recompute to this front."
+                : " · Showing install movement lines."}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {hasLook && simPlay.lookNote && showLook && !immersive && (
+        <div className="space-y-2">
+          <p className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs leading-relaxed text-[var(--color-muted)]">
+            <span className="font-semibold text-[var(--color-fg)]">
+              {assignReport?.schemeUsesGod ? "GOD ON · " : "GOD limited · "}
+            </span>
+            {simPlay.lookNote}
+          </p>
+          {customMode && (
+            <p className="rounded-[var(--radius-lg)] border border-[color-mix(in_oklab,var(--color-primary)_40%,var(--color-border))] bg-[color-mix(in_oklab,var(--color-primary-dim)_35%,var(--color-surface))] px-3 py-2 text-xs leading-relaxed text-[var(--color-fg)]">
+              <span className="font-semibold text-[var(--color-primary)]">Custom front: </span>
+              Drag any diamond. Gaps and every OL assignment recompute live.
+              <button type="button" className="ml-2 font-semibold underline" onClick={() => setCustomPos({})}>
+                Reset alignment
+              </button>
+            </p>
+          )}
+          {assignReport && olMode === "assignment" && (
+            <div className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--color-subtle)]">
+                Player assignments · {assignReport.frontLabel}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--color-muted)]">{assignReport.schemeNote}</p>
+              {assignReport.gaps.length > 0 && (
+                <p className="mt-2 text-[11px] text-[var(--color-subtle)]">
+                  Gaps: {assignReport.gaps.slice(0, 5).map((g) => g.label).join(" · ")}
+                </p>
+              )}
+              <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto overscroll-contain">
+                {(["lt", "lg", "c", "rg", "rt", "y", "fb"] as const).map((id) => {
+                  const r = assignReport.roles.find((x) => x.roleId === id);
+                  if (!r) return null;
+                  return (
+                    <li key={id} className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-elevated)] px-2.5 py-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-display text-sm font-semibold uppercase text-[var(--color-fg)]">{r.roleId}</span>
+                        <Badge variant={r.usesGod ? "default" : "outline"} className="text-[10px]">
+                          {r.usesGod ? "GOD" : "not GOD"}
+                        </Badge>
+                        <span className="text-[10px] uppercase tracking-wide text-[var(--color-subtle)]">{r.rule}</span>
+                        {r.targetTags.length > 0 && (
+                          <span className="text-[11px] text-[var(--color-primary)]">→ {r.targetTags.join("+")}</span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--color-muted)]">{r.why}</p>
+                      {r.whyNotGod && (
+                        <p className="mt-1 text-[11px] leading-relaxed text-[var(--color-subtle)]">Why not GOD: {r.whyNotGod}</p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
 
       {!immersive && (
       <section className="w-full max-w-full min-w-0">
