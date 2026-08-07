@@ -708,21 +708,48 @@ export function evaluateAssignments(
             .join("+")} on ${dl.tag} (shared On by distance).`,
           true,
         );
-        for (const ol of ols) {
+        // Post stays on the DL (deep drive); climber posts then peels to LB.
+        // Prefer Center as post when in the combo (standard dive/iso nose work).
+        const pair = ols.slice(0, 2) as string[];
+        const postOl =
+          pair.includes("c")
+            ? "c"
+            : pair.slice().sort((a, b) => {
+                // Playside post (closer to POA) stays; backside climbs
+                const poa = ps === "R" ? 56 : 44;
+                return (
+                  Math.abs(OL_X[a]! - poa) - Math.abs(OL_X[b]! - poa)
+                );
+              })[0]!;
+        const climbOl = pair.find((x) => x !== postOl) ?? pair[1]!;
+        for (const ol of pair) {
           const ra = ensureRole(ol);
-          const partner = ols.find((x) => x !== ol);
+          const partner = pair.find((x) => x !== ol);
           const onDist = dist2d(OL_X[ol]!, OL_Y, alignX(dl), alignY(dl));
           ra.rule = "god-combo";
           ra.usesGod = true;
           ra.targetIds = [dl.id];
           ra.targetTags = [dl.tag];
-          ra.why = `Combo On ${dl.tag} (${onDist.toFixed(1)} yd) with ${partner?.toUpperCase() ?? "partner"}. Drive as one; one climbs LB on flow.`;
-          ra.job = `Combo ${dl.tag} w/ ${partner?.toUpperCase() ?? "?"}`;
-          ra.path = pathCombo(
-            [OL_X[ol]!, OL_Y],
-            [alignX(dl), alignY(dl)],
-            nearestLb(lbs, OL_X[ol]!),
-          );
+          const isPost = ol === postOl;
+          ra.why = isPost
+            ? `POST on combo ${dl.tag} (${onDist.toFixed(1)} yd) with ${partner?.toUpperCase() ?? "partner"}. Drive him off the ball — do not stall.`
+            : `COMBO ${dl.tag} with ${partner?.toUpperCase() ?? "partner"} then climb LB on flow (${onDist.toFixed(1)} yd On).`;
+          ra.job = isPost
+            ? `Post ${dl.tag} w/ ${partner?.toUpperCase() ?? "?"}`
+            : `Combo-climb ${dl.tag} w/ ${partner?.toUpperCase() ?? "?"}`;
+          if (isPost) {
+            // Full base drive through the DL (center must move on dive)
+            ra.path = pathBase(
+              [OL_X[ol]!, OL_Y],
+              [alignX(dl), alignY(dl)],
+            );
+          } else {
+            ra.path = pathCombo(
+              [OL_X[ol]!, OL_Y],
+              [alignX(dl), alignY(dl)],
+              nearestLb(lbs, OL_X[ol]!),
+            );
+          }
         }
       } else if (ols.length === 1 && dl.engagedBy.length === 0) {
         // Ensure engagement applied
@@ -854,18 +881,18 @@ export function evaluateAssignments(
   }
 
   function pathBase(from: FieldPoint, to: FieldPoint): FieldPoint[] {
-    // Fire off → contact (slightly offense-side of D) → drive through on one angle
+    // Fire off → contact → drive through (must travel — no "statue" blocks)
     const contact: FieldPoint = [to[0], to[1] + 0.9];
-    const mid = lerpPt(from, contact, 0.45);
-    mid[1] = Math.min(mid[1], from[1] - 0.4);
+    const mid = lerpPt(from, contact, 0.4);
+    mid[1] = Math.min(mid[1], from[1] - 0.55);
     const driveDirX = contact[0] - from[0];
     const drive: FieldPoint = [
-      contact[0] + driveDirX * 0.12,
-      contact[1] - 3.2,
+      contact[0] + driveDirX * 0.15,
+      contact[1] - 4.0,
     ];
     const finish: FieldPoint = [
-      contact[0] + driveDirX * 0.18,
-      contact[1] - 5.5,
+      contact[0] + driveDirX * 0.22,
+      Math.min(contact[1] - 7.5, 40),
     ];
     return cleanPath([from, mid, contact, drive, finish]);
   }
@@ -875,15 +902,23 @@ export function evaluateAssignments(
     post: FieldPoint,
     lb: FieldPoint | null,
   ): FieldPoint[] {
-    const climb = lb ?? ([post[0], post[1] - 6] as FieldPoint);
-    const contact: FieldPoint = [post[0], post[1] + 0.6];
-    const midPost = lerpPt(from, contact, 0.5);
-    midPost[1] = Math.min(midPost[1], from[1] - 0.3);
-    // Climb continues downfield (smaller y), no reverse toward LOS
-    const climbMid = lerpPt(contact, climb, 0.55);
-    climbMid[1] = Math.min(climbMid[1], contact[1] - 0.8);
-    const climbEnd: FieldPoint = [climb[0], Math.min(climb[1], contact[1] - 2)];
-    return cleanPath([from, midPost, contact, climbMid, climbEnd]);
+    const climb = lb ?? ([post[0], post[1] - 8] as FieldPoint);
+    const contact: FieldPoint = [post[0], post[1] + 0.7];
+    const midPost = lerpPt(from, contact, 0.45);
+    midPost[1] = Math.min(midPost[1], from[1] - 0.5);
+    // Drive the double THROUGH the DL before peeling — critical so C/LG actually move
+    const drive: FieldPoint = [
+      post[0] + (post[0] - from[0]) * 0.08,
+      post[1] - 3.2,
+    ];
+    // Climb only after drive; finish at LB depth or deeper (never stall at contact)
+    const climbMid = lerpPt(drive, climb, 0.5);
+    climbMid[1] = Math.min(climbMid[1], drive[1] - 1.2);
+    const climbEnd: FieldPoint = [
+      climb[0],
+      Math.min(climb[1] - 1.5, drive[1] - 3, 42),
+    ];
+    return cleanPath([from, midPost, contact, drive, climbMid, climbEnd]);
   }
 
   function pathClimb(from: FieldPoint, lb: FieldPoint | null): FieldPoint[] {
