@@ -42,6 +42,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const SPEEDS = [0.75, 1, 1.5, 2] as const;
+/** Visual marker scale only — physics hitboxes stay fixed. Default under 1 for clearer diagrams. */
+const BUBBLE_SCALE_DEFAULT = 0.72;
+const BUBBLE_SCALE_MIN = 0.4;
+const BUBBLE_SCALE_MAX = 2;
 
 function schemeCapable(playId: string): boolean {
   return [
@@ -107,7 +111,8 @@ function deconflictPositions(
   const pts = items.map((it) => ({ ...it, x: it.x, y: it.y }));
   // Higher priority (pullers / focused) keep preferred seat; others yield
   pts.sort((a, b) => a.priority - b.priority);
-  for (let iter = 0; iter < 6; iter++) {
+  // Gentle, few-pass deconflict — avoid frame-to-frame zigzag from over-push
+  for (let iter = 0; iter < 3; iter++) {
     for (let i = 0; i < pts.length; i++) {
       for (let j = i + 1; j < pts.length; j++) {
         const a = pts[i]!;
@@ -115,18 +120,18 @@ function deconflictPositions(
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const dist = Math.hypot(dx, dy) || 0.001;
-        // Fixed hitbox seats — small shell, gentle correction (no UI-scale inflation)
-        const min = a.r + b.r + 0.35;
+        const min = a.r + b.r + 0.2;
         if (dist < min) {
-          const push = (min - dist) * 0.45;
+          const push = (min - dist) * 0.28;
           const nx = dx / dist;
           const ny = dy / dist;
-          const aW = a.priority >= b.priority ? 0.2 : 0.8;
+          // Prefer lateral separation so we don't yank blockers off their track
+          const aW = a.priority >= b.priority ? 0.15 : 0.85;
           const bW = 1 - aW;
           a.x -= nx * push * aW;
-          a.y -= ny * push * aW;
+          a.y -= ny * push * aW * 0.35;
           b.x += nx * push * bW;
-          b.y += ny * push * bW;
+          b.y += ny * push * bW * 0.35;
         }
       }
     }
@@ -272,7 +277,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
   const [showPhasePanel, setShowPhasePanel] = useState(false);
   const [showImmersiveOpts, setShowImmersiveOpts] = useState(false);
   /** Player bubble size multiplier (0.6–2). Affects OL + D markers for clarity. */
-  const [bubbleScale, setBubbleScale] = useState(1);
+  const [bubbleScale, setBubbleScale] = useState(BUBBLE_SCALE_DEFAULT);
   /** Diagram zoom 1–2.5 (viewBox) */
   const [zoom, setZoom] = useState(1);
   const [customPos, setCustomPos] = useState<Record<string, FieldPoint>>({});
@@ -1357,8 +1362,8 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
           </span>
           <input
             type="range"
-            min={0.6}
-            max={2}
+            min={BUBBLE_SCALE_MIN}
+            max={BUBBLE_SCALE_MAX}
             step={0.05}
             value={bubbleScale}
             onChange={(e) => setBubbleScale(Number(e.target.value))}
@@ -1382,9 +1387,9 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
           </span>
           <button
             type="button"
-            onClick={() => setBubbleScale(1)}
+            onClick={() => setBubbleScale(BUBBLE_SCALE_DEFAULT)}
             className="h-7 shrink-0 rounded-full border border-[var(--color-border)] px-2 text-[10px] font-semibold text-[var(--color-muted)] touch-manipulation disabled:opacity-40"
-            disabled={Math.abs(bubbleScale - 1) < 0.01}
+            disabled={Math.abs(bubbleScale - BUBBLE_SCALE_DEFAULT) < 0.01}
             aria-label="Reset bubble size"
           >
             Reset

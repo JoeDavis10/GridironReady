@@ -806,57 +806,143 @@ export function evaluateAssignments(
   };
 
   // Helper paths
+  /**
+   * Smooth monotonic OL paths — no backtracking / zigzag.
+   * Field: OL start ~y=52, defense smaller y (drive = decreasing y).
+   */
+  function lerpPt(a: FieldPoint, b: FieldPoint, t: number): FieldPoint {
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  }
+
+  /** Drop reverse-hook points so animation never zigzags. */
+  function cleanPath(pts: FieldPoint[]): FieldPoint[] {
+    if (pts.length <= 2) return pts.map((p) => [p[0], p[1]] as FieldPoint);
+    const out: FieldPoint[] = [[pts[0]![0], pts[0]![1]]];
+    for (let i = 1; i < pts.length; i++) {
+      const cur = pts[i]!;
+      const prev = out[out.length - 1]!;
+      if (Math.hypot(cur[0] - prev[0], cur[1] - prev[1]) < 0.15) continue;
+      if (out.length >= 2) {
+        const a = out[out.length - 2]!;
+        const b = prev;
+        const v1x = b[0] - a[0];
+        const v1y = b[1] - a[1];
+        const v2x = cur[0] - b[0];
+        const v2y = cur[1] - b[1];
+        const m1 = Math.hypot(v1x, v1y);
+        const m2 = Math.hypot(v2x, v2y);
+        if (m1 > 0.05 && m2 > 0.05) {
+          const cos = (v1x * v2x + v1y * v2y) / (m1 * m2);
+          // Sharp reverse (>100°) — skip the kink point (prev), replace with cur
+          if (cos < -0.25) {
+            out[out.length - 1] = [cur[0], cur[1]];
+            continue;
+          }
+        }
+      }
+      out.push([cur[0], cur[1]]);
+    }
+    // Ensure final point is the intended end
+    const last = pts[pts.length - 1]!;
+    const end = out[out.length - 1]!;
+    if (Math.hypot(last[0] - end[0], last[1] - end[1]) > 0.2) {
+      out.push([last[0], last[1]]);
+    }
+    return out.length >= 2 ? out : pts.map((p) => [p[0], p[1]] as FieldPoint);
+  }
+
   function pathBase(from: FieldPoint, to: FieldPoint): FieldPoint[] {
-    return [
-      from,
-      [from[0] + (to[0] - from[0]) * 0.35, from[1] - 1],
-      [to[0], to[1] + 0.8],
-      [to[0], to[1] - 2.5],
-      [to[0], to[1] - 5],
+    // Fire off → contact (slightly offense-side of D) → drive through on one angle
+    const contact: FieldPoint = [to[0], to[1] + 0.9];
+    const mid = lerpPt(from, contact, 0.45);
+    mid[1] = Math.min(mid[1], from[1] - 0.4);
+    const driveDirX = contact[0] - from[0];
+    const drive: FieldPoint = [
+      contact[0] + driveDirX * 0.12,
+      contact[1] - 3.2,
     ];
-  }
-  function pathCombo(from: FieldPoint, post: FieldPoint, lb: FieldPoint | null): FieldPoint[] {
-    const climb = lb ?? [post[0], post[1] - 6];
-    return [
-      from,
-      [(from[0] + post[0]) / 2, (from[1] + post[1]) / 2 + 0.4],
-      [post[0], post[1] + 0.5],
-      [(post[0] + climb[0]) / 2, (post[1] + climb[1]) / 2],
-      [climb[0], climb[1] - 1],
+    const finish: FieldPoint = [
+      contact[0] + driveDirX * 0.18,
+      contact[1] - 5.5,
     ];
+    return cleanPath([from, mid, contact, drive, finish]);
   }
+
+  function pathCombo(
+    from: FieldPoint,
+    post: FieldPoint,
+    lb: FieldPoint | null,
+  ): FieldPoint[] {
+    const climb = lb ?? ([post[0], post[1] - 6] as FieldPoint);
+    const contact: FieldPoint = [post[0], post[1] + 0.6];
+    const midPost = lerpPt(from, contact, 0.5);
+    midPost[1] = Math.min(midPost[1], from[1] - 0.3);
+    // Climb continues downfield (smaller y), no reverse toward LOS
+    const climbMid = lerpPt(contact, climb, 0.55);
+    climbMid[1] = Math.min(climbMid[1], contact[1] - 0.8);
+    const climbEnd: FieldPoint = [climb[0], Math.min(climb[1], contact[1] - 2)];
+    return cleanPath([from, midPost, contact, climbMid, climbEnd]);
+  }
+
   function pathClimb(from: FieldPoint, lb: FieldPoint | null): FieldPoint[] {
-    const t = lb ?? [from[0], 42];
-    return [from, [from[0], from[1] - 2], [t[0], t[1] + 1], [t[0], t[1] - 1]];
+    const t = lb ?? ([from[0], 42] as FieldPoint);
+    const mid = lerpPt(from, t, 0.4);
+    mid[1] = Math.min(mid[1], from[1] - 1.2);
+    const near: FieldPoint = [t[0], Math.min(t[1] + 0.5, mid[1] - 0.5)];
+    const end: FieldPoint = [t[0], Math.min(t[1] - 0.8, near[1] - 0.8)];
+    return cleanPath([from, mid, near, end]);
   }
-  function pathPull(from: FieldPoint, target: FieldPoint, psDir: "L" | "R"): FieldPoint[] {
-    const lat = psDir === "R" ? -1 : 1; // pull toward playside from backside
-    // Actually pull from backside toward playside
+
+  function pathPull(
+    from: FieldPoint,
+    target: FieldPoint,
+    _psDir: "L" | "R",
+  ): FieldPoint[] {
     const toward = target[0] > from[0] ? 1 : -1;
-    return [
-      from,
-      [from[0] + toward * 2, from[1]],
-      [(from[0] + target[0]) / 2, from[1] - 0.3],
-      [target[0], target[1] + 1],
-      [target[0], target[1] - 2],
+    // Flat pull: open step → skip across → turn up into target — always progressing
+    const open: FieldPoint = [from[0] + toward * 2.5, from[1] - 0.15];
+    const skip: FieldPoint = [
+      from[0] + (target[0] - from[0]) * 0.55,
+      from[1] - 0.35,
     ];
+    const turn: FieldPoint = [
+      target[0] - toward * 0.8,
+      Math.min(target[1] + 1.2, from[1] - 0.6),
+    ];
+    const kick: FieldPoint = [target[0], Math.min(target[1] - 1.2, turn[1] - 1)];
+    return cleanPath([from, open, skip, turn, kick]);
   }
+
   function pathReach(from: FieldPoint, to: FieldPoint, dir: number): FieldPoint[] {
-    return [
-      from,
-      [from[0] + dir * 3, from[1] - 0.4],
-      [to[0] - dir * 0.5, to[1] + 0.6],
-      [to[0] + dir * 1.5, to[1] - 1.5],
-      [to[0] + dir * 2.5, to[1] - 4],
+    // Reach: gain width first, then seal — monotonic playside + downfield
+    const step: FieldPoint = [from[0] + dir * 2.5, from[1] - 0.35];
+    const gain: FieldPoint = [
+      from[0] + dir * 4.2,
+      Math.min(to[1] + 0.8, from[1] - 0.8),
     ];
+    const seal: FieldPoint = [to[0] + dir * 0.8, Math.min(to[1] - 0.5, gain[1] - 1)];
+    const finish: FieldPoint = [to[0] + dir * 1.8, seal[1] - 2.8];
+    return cleanPath([from, step, gain, seal, finish]);
   }
+
   function pathHinge(from: FieldPoint, de: FieldPoint): FieldPoint[] {
-    return [
-      from,
-      [from[0], from[1] - 0.5],
-      [de[0] + (from[0] < de[0] ? -1 : 1), de[1] + 0.5],
-      [from[0], from[1] - 1],
+    // Set and absorb — step to DE pads and SIT. Never return to original landmark.
+    const outside = from[0] < de[0] ? -1 : 1;
+    const set: FieldPoint = [from[0], from[1] - 0.35];
+    const pads: FieldPoint = [
+      de[0] + outside * 1.1,
+      de[1] + 0.7,
     ];
+    const absorb: FieldPoint = [
+      de[0] + outside * 0.9,
+      de[1] + 0.15,
+    ];
+    // Slight give (still not back toward snap landmark laterally past pads)
+    const sit: FieldPoint = [
+      de[0] + outside * 0.7,
+      de[1] - 0.4,
+    ];
+    return cleanPath([from, set, pads, absorb, sit]);
   }
 
   function findDownDefender(
@@ -1721,21 +1807,50 @@ function attachDrivePaths(
     def.job = `${def.job} · drive ${ang.toFixed(0)}° ${yards.toFixed(0)}yd`;
   }
 
-  // Nudge OL assignment paths to finish along same drive timeline length
+  // Keep OL assignment paths as built — do NOT stitch drive-finish hooks
+  // (those created lateral/vertical reverse segments = zigzag animation).
   for (const ra of roleMap.values()) {
-    if (ra.path.length < 2 || !ra.targetIds.length) continue;
-    const target = defs.find((d) => d.id === ra.targetIds[0]);
-    if (!target?.drivePath?.length) continue;
-    const fin = target.drivePath[target.drivePath.length - 1]!;
-    const last = ra.path[ra.path.length - 1]!;
-    // Extend OL finish slightly toward drive finish so motion lasts
-    ra.path = [
-      ...ra.path,
-      [(last[0] + fin[0]) / 2, (last[1] + fin[1]) / 2],
-      [fin[0] + (last[0] - fin[0]) * 0.15, fin[1] + 0.8],
-    ];
+    if (ra.path.length >= 2) {
+      ra.path = cleanRolePath(ra.path);
+    }
   }
 }
+
+/** Module-level path cleaner for assignment paths after scheme overlays. */
+function cleanRolePath(pts: FieldPoint[]): FieldPoint[] {
+  if (pts.length <= 2) return pts.map((p) => [p[0], p[1]] as FieldPoint);
+  const out: FieldPoint[] = [[pts[0]![0], pts[0]![1]]];
+  for (let i = 1; i < pts.length; i++) {
+    const cur = pts[i]!;
+    const prev = out[out.length - 1]!;
+    if (Math.hypot(cur[0] - prev[0], cur[1] - prev[1]) < 0.15) continue;
+    if (out.length >= 2) {
+      const a = out[out.length - 2]!;
+      const b = prev;
+      const v1x = b[0] - a[0];
+      const v1y = b[1] - a[1];
+      const v2x = cur[0] - b[0];
+      const v2y = cur[1] - b[1];
+      const m1 = Math.hypot(v1x, v1y);
+      const m2 = Math.hypot(v2x, v2y);
+      if (m1 > 0.05 && m2 > 0.05) {
+        const cos = (v1x * v2x + v1y * v2y) / (m1 * m2);
+        if (cos < -0.25) {
+          out[out.length - 1] = [cur[0], cur[1]];
+          continue;
+        }
+      }
+    }
+    out.push([cur[0], cur[1]]);
+  }
+  const last = pts[pts.length - 1]!;
+  const end = out[out.length - 1]!;
+  if (Math.hypot(last[0] - end[0], last[1] - end[1]) > 0.2) {
+    out.push([last[0], last[1]]);
+  }
+  return out.length >= 2 ? out : pts.map((p) => [p[0], p[1]] as FieldPoint);
+}
+
 
 
 /** @deprecated use evaluateAssignments — kept for call sites */
