@@ -33,6 +33,7 @@ export interface PlayLook {
 export type DefFrontId =
   | "43-over"
   | "43-under"
+  | "43-balanced"
   | "52"
   | "34"
   | "bear"
@@ -58,6 +59,12 @@ export const DEF_FRONTS: DefFrontMeta[] = [
     label: "4-3 Under",
     short: "4-3 U",
     blurb: "Even front, shade weak — 3-tech flips.",
+  },
+  {
+    id: "43-balanced",
+    label: "4-3 Balanced",
+    short: "4-3 B",
+    blurb: "Even front, 2-tech both sides — no over/under shade. Will·Mike·Sam on B/A/C.",
   },
   {
     id: "52",
@@ -331,6 +338,39 @@ export function buildFrontAlignments(frontId: DefFrontId): LookDefender[] {
         "Sam",
         [GAP.strongB, lb],
         `Sam · strong B (RG–RT) · 5 yd — strong flow / TE help`,
+      ),
+      fs, ss, cbL, cbR,
+    ];
+  }
+
+  if (frontId === "43-balanced") {
+    // Balanced even: 5-tech ends + 2-tech (head-up G) both sides — no shade skew
+    // Will weak B · Mike ball/A · Sam strong C
+    return [
+      d("look-de-l", "E", "LE", [LT - 2.5, DL_Y], "Weak 5-tech · C-gap edge"),
+      d("look-dt-l", "T", "2-tech", [LG, DL_Y], "Weak 2-tech · head-up LG"),
+      d("look-dt-r", "T", "2-tech", [RG, DL_Y], "Strong 2-tech · head-up RG"),
+      d("look-de-r", "E", "RE", [RT + 2.5, DL_Y], "Strong 5-tech · C-gap edge"),
+      d(
+        "look-will",
+        "W",
+        "Will",
+        [GAP.weakB, lb],
+        `Will · weak B (LG–C) · 5 yd — scrape weak flow`,
+      ),
+      d(
+        "look-mike",
+        "M",
+        "Mike",
+        [C, lb],
+        `Mike · A / ball · 5 yd — both A on flow`,
+      ),
+      d(
+        "look-sam",
+        "S",
+        "Sam",
+        [GAP.strongC, lb],
+        `Sam · strong C (RT–TE) · 5 yd — TE / force`,
       ),
       fs, ss, cbL, cbR,
     ];
