@@ -1060,96 +1060,366 @@ export function evaluateAssignments(
       }
     }
   } else if (scheme === "counter-simple" || scheme === "counter") {
+    /**
+     * Counter LEFT (install).
+     * CTR-S: RG only pulls; RT hinges.
+     * Full CTR: RG + RT pull; Y cutoff/hinge backside.
+     *
+     * Critical hole integrity:
+     * - Wall (LT/LG) downs first interior DL counter side
+     * - C blocks BACK the DL that RG leaves (vacated B) — never leave him free in the RB's face
+     * - RG kicks first force LB (Will)
+     * - FB wraps Mike (second level) — do NOT double-assign FB on the same Will as RG
+     * - Mike must not be free in the counter crease
+     */
     assignGodBase();
+
+    const stripOl = (olId: string) => {
+      for (const d of defs) {
+        if (!d.engagedBy.includes(olId)) continue;
+        d.engagedBy = d.engagedBy.filter((x) => x !== olId);
+        d.doubleTeam = d.engagedBy.length >= 2;
+        if (d.engagedBy.length === 0) d.job = `${d.label} · free until reassigned`;
+      }
+    };
+
     const leftEdge = dls[0];
     const rightEdge = dls[dls.length - 1];
-    const kickLb = nearestLbDef(lbs, 38);
-    const leftInterior = dls[1] ?? dls[0];
+    // Interior wall man = first DL inside of left edge (or left edge if only one)
+    const leftInterior =
+      dls.length >= 2
+        ? dls.slice(1).sort((a, b) => alignX(a) - alignX(b))[0] ?? dls[1]
+        : dls[0];
+    // Prefer wall target near LG (44) / left B-A
+    const wallDl =
+      dls
+        .filter((d) => d.id !== rightEdge?.id)
+        .slice()
+        .sort(
+          (a, b) =>
+            Math.abs(alignX(a) - 44) - Math.abs(alignX(b) - 44),
+        )[0] ?? leftInterior;
 
-    if (leftInterior) {
+    // Vacated by RG pull: interior DLs only (not wall, not hinge EMOL on CTR-S)
+    const vacatedPool = dls.filter((d) => {
+      if (wallDl && d.id === wallDl.id) return false;
+      // RT hinges the right edge on CTR-S — that man is not C's block-back
+      if (
+        scheme === "counter-simple" &&
+        rightEdge &&
+        d.id === rightEdge.id
+      ) {
+        return false;
+      }
+      // Outside left EMOL already sealed by wall/Y
+      if (
+        leftEdge &&
+        wallDl &&
+        d.id === leftEdge.id &&
+        leftEdge.id !== wallDl.id
+      ) {
+        return false;
+      }
+      return true;
+    });
+    // Primary = nearest to RG (the On he leaves)
+    const vacatedDl =
+      vacatedPool
+        .slice()
+        .sort(
+          (a, b) =>
+            Math.abs(alignX(a) - OL_X.rg!) - Math.abs(alignX(b) - OL_X.rg!),
+        )[0] ?? null;
+    // Any other interior free men also cannot sit in the counter path
+    const extraInterior = vacatedPool.filter((d) => d.id !== vacatedDl?.id);
+
+    // Sort LBs by distance to counter POA (~40) then hole (~48)
+    const lbsByPoa = lbs
+      .slice()
+      .sort(
+        (a, b) =>
+          Math.hypot(alignX(a) - 40, alignY(a) - 46) -
+          Math.hypot(alignX(b) - 40, alignY(b) - 46),
+      );
+    const kickLb = lbsByPoa[0] ?? null; // first force color
+    // Wrap = next LB toward the hole (not the kick man)
+    const wrapLb =
+      lbsByPoa.find((l) => l.id !== kickLb?.id && alignX(l) <= 58) ??
+      lbsByPoa[1] ??
+      null;
+    // Extra box LBs (3-4 double ILB) still near crease
+    const extraHoleLbs = lbs.filter(
+      (l) =>
+        l.id !== kickLb?.id &&
+        l.id !== wrapLb?.id &&
+        alignX(l) >= 40 &&
+        alignX(l) <= 56,
+    );
+
+    // --- Counter wall (playside) ---
+    if (wallDl) {
       setDefEng(
-        leftInterior,
+        wallDl,
         ["lt", "lg"],
-        `Counter down wall on ${leftInterior.tag} — GOD down (counter side).`,
+        `Counter wall (GOD down): LT+LG on ${wallDl.tag}. Create the crease.`,
         true,
       );
       for (const ol of ["lt", "lg"] as const) {
         const ra = ensureRole(ol);
         ra.rule = "god-down";
         ra.usesGod = true;
-        ra.why = `Counter wall: GOD down on ${leftInterior.tag}. Create the crease for the puller(s).`;
-        ra.targetIds = [leftInterior.id];
-        ra.targetTags = [leftInterior.tag];
-        ra.job = `Down ${leftInterior.tag}`;
-        ra.path = pathBase([OL_X[ol]!, 52], [alignX(leftInterior), alignY(leftInterior)]);
+        ra.why = `Counter wall: GOD down on ${wallDl.tag} (${dist2d(OL_X[ol]!, OL_Y, alignX(wallDl), alignY(wallDl)).toFixed(1)} yd). Seal him — the hole is behind this block.`;
+        ra.targetIds = [wallDl.id];
+        ra.targetTags = [wallDl.tag];
+        ra.job = `Down wall ${wallDl.tag}`;
+        ra.path = pathBase(
+          [OL_X[ol]!, OL_Y],
+          [alignX(wallDl), alignY(wallDl)],
+        );
       }
     }
+
+    // Left EMOL help if separate from wall
+    if (leftEdge && wallDl && leftEdge.id !== wallDl.id) {
+      setDefEng(
+        leftEdge,
+        ["lt", "y"].filter((id, i, a) => a.indexOf(id) === i),
+        `Wall edge ${leftEdge.tag} — LT/Y seal outside the crease.`,
+        true,
+      );
+      const yra = ensureRole("y");
+      yra.rule = "god-down";
+      yra.usesGod = true;
+      yra.why = `Help seal EMOL ${leftEdge.tag} on the counter edge so force can't spill into the hole.`;
+      yra.targetIds = [leftEdge.id];
+      yra.targetTags = [leftEdge.tag];
+      yra.job = `Seal edge ${leftEdge.tag}`;
+      yra.path = pathBase([OL_X.y!, OL_Y], [alignX(leftEdge), alignY(leftEdge)]);
+    }
+
+    // --- C block-back on vacated DL(s) — nobody free in the counter path ---
+    stripOl("rg");
+    stripOl("c");
+    const cra = ensureRole("c");
+    cra.rule = "god-down";
+    cra.usesGod = true;
+    cra.targetIds = [];
+    cra.targetTags = [];
+
+    if (vacatedDl) {
+      setDefEng(
+        vacatedDl,
+        ["c"],
+        `Block-back: C on ${vacatedDl.tag} — the On RG vacated. Free = unblocked in the counter path.`,
+        false,
+      );
+      cra.targetIds.push(vacatedDl.id);
+      cra.targetTags.push(vacatedDl.tag);
+      cra.why = `RG pulls — block back ${vacatedDl.tag} (${dist2d(50, OL_Y, alignX(vacatedDl), alignY(vacatedDl)).toFixed(1)} yd). GOD gap integrity for the pull. Climb only after he is secured.`;
+      cra.job = `Block back ${vacatedDl.tag}`;
+      cra.path = pathBase([50, OL_Y], [alignX(vacatedDl), alignY(vacatedDl)]);
+    } else if (wallDl) {
+      // 3-man front: no separate vacated interior — C posts on the wall / climbs late
+      const wallEng = [...new Set([...wallDl.engagedBy, "c"])];
+      setDefEng(
+        wallDl,
+        wallEng,
+        `3-down front: C posts wall on ${wallDl.tag} (no separate vacated DL). Climb Mike only when secure.`,
+        wallEng.length >= 2,
+      );
+      cra.targetIds = [wallDl.id];
+      cra.targetTags = [wallDl.tag];
+      cra.why = `Odd/light front — no separate B-gap man. Post the wall (${wallDl.tag}), then climb. Don't freestyle and leave a free hitter.`;
+      cra.job = `Post wall ${wallDl.tag}`;
+      cra.path = pathCombo(
+        [50, OL_Y],
+        [alignX(wallDl), alignY(wallDl)],
+        nearestLb(lbs, 50),
+      );
+    }
+
+    // Extra interior DLs (e.g. 5-2 nose + 3-tech): C must account — never leave free in box
+    for (const extra of extraInterior) {
+      if (extra.engagedBy.length > 0) continue;
+      const eng = [...new Set([...extra.engagedBy, "c"])];
+      setDefEng(
+        extra,
+        eng,
+        `Also block-back/account: ${extra.tag} is interior free — C's dual read with primary vacated. Cannot leave him in the RB's face.`,
+        false,
+      );
+      if (!cra.targetIds.includes(extra.id)) {
+        cra.targetIds.push(extra.id);
+        cra.targetTags.push(extra.tag);
+      }
+      cra.why = `${cra.why} Also account for ${extra.tag} if he shows in the pull path (dual interior surface).`;
+      cra.job = `Block back ${cra.targetTags.join("+")}`;
+    }
+
+    // --- Second level: G kicks Will, FB wraps Mike (split — never both on one LB) ---
+    if (kickLb) {
+      setDefEng(
+        kickLb,
+        ["rg"],
+        `Pull kick: RG only on ${kickLb.tag} (force). FB does NOT double this man — he wraps Mike.`,
+        false,
+      );
+      const ra = ensureRole("rg");
+      ra.rule = "pull";
+      ra.usesGod = false;
+      ra.whyNotGod = "Puller leaves his On — exception to GOD base.";
+      ra.why = `ONLY puller on CTR-S (or lead puller on full CTR). Flat path, kick ${kickLb.tag}. C has your vacated DL — trust the block-back.`;
+      ra.targetIds = [kickLb.id];
+      ra.targetTags = [kickLb.tag];
+      ra.job = `Pull kick ${kickLb.tag}`;
+      ra.path = pathPull(
+        [OL_X.rg!, OL_Y],
+        [alignX(kickLb), alignY(kickLb)],
+        "L",
+      );
+    }
+
+    if (wrapLb) {
+      setDefEng(
+        wrapLb,
+        scheme === "counter-simple"
+          ? ["fb"]
+          : ["fb", "rt"].filter((x, i, a) => a.indexOf(x) === i),
+        scheme === "counter-simple"
+          ? `Wrap: FB on ${wrapLb.tag} (hole). Leaving him free = unblocked in the counter's face.`
+          : `Wrap: FB + trail puller on ${wrapLb.tag} in the hole.`,
+        scheme !== "counter-simple",
+      );
+      const fb = ensureRole("fb");
+      fb.rule = "lead";
+      fb.usesGod = false;
+      fb.whyNotGod = "Fullback lead/wrap is not an OL GOD rule.";
+      fb.why = `Wrap ${wrapLb.tag} in the crease. RG kicks force; you take the hole LB. Do not both hit Will — the hole LB would be free in the RB's face.`;
+      fb.targetIds = [wrapLb.id];
+      fb.targetTags = [wrapLb.tag];
+      fb.job = `Wrap ${wrapLb.tag}`;
+      fb.path = pathClimb([48, 60], [alignX(wrapLb), alignY(wrapLb)]);
+    }
+    // 3-4 / stacked ILBs: second hole LB cannot sit free in the crease
+    for (const extra of extraHoleLbs) {
+      if (extra.engagedBy.length) continue;
+      setDefEng(
+        extra,
+        ["fb"],
+        `Second hole LB ${extra.tag} — FB dual read after primary wrap (3-4 surface).`,
+        false,
+      );
+      const fb = ensureRole("fb");
+      if (!fb.targetIds.includes(extra.id)) {
+        fb.targetIds.push(extra.id);
+        fb.targetTags.push(extra.tag);
+        fb.why = `${fb.why} Also alert ${extra.tag} (extra ILB in the box).`;
+        fb.job = `Wrap ${fb.targetTags.join("+")}`;
+      }
+    }
+
     if (scheme === "counter-simple") {
-      // Only G pulls; RT hinges
+      // RT hinges — stays home so we don't open backside free runner on the same snap we install G-only pull
       if (rightEdge) {
+        stripOl("rt");
         setDefEng(
           rightEdge,
           ["rt"],
-          `Hinge: RT stays home vs ${rightEdge.tag} (simplified — no T pull).`,
+          `Hinge: RT stays home vs ${rightEdge.tag} (CTR-S — no T pull).`,
           false,
         );
         const ra = ensureRole("rt");
         ra.rule = "hinge";
         ra.usesGod = true;
-        ra.why = `CTR-S: only guard pulls. You hinge — GOD gap integrity on ${rightEdge.tag}.`;
+        ra.why = `CTR-S: only guard pulls. Hinge ${rightEdge.tag} — gap integrity backside. You are not a free release.`;
         ra.targetIds = [rightEdge.id];
         ra.targetTags = [rightEdge.tag];
         ra.job = `Hinge ${rightEdge.tag}`;
-        ra.path = pathHinge([OL_X.rt!, 52], [alignX(rightEdge), alignY(rightEdge)]);
-      }
-      if (kickLb) {
-        setDefEng(
-          kickLb,
-          ["rg", "fb"],
-          `Single pull kick: RG + FB on ${kickLb.tag}.`,
-          true,
+        ra.path = pathHinge(
+          [OL_X.rt!, OL_Y],
+          [alignX(rightEdge), alignY(rightEdge)],
         );
-        const ra = ensureRole("rg");
-        ra.rule = "pull";
-        ra.usesGod = false;
-        ra.whyNotGod = "Puller leaves his On — exception to GOD.";
-        ra.why = `Flat pull (only puller in CTR-S). Kick ${kickLb.tag}.`;
-        ra.targetIds = [kickLb.id];
-        ra.targetTags = [kickLb.tag];
-        ra.job = `Pull kick ${kickLb.tag}`;
-        ra.path = pathPull([OL_X.rg!, 52], [alignX(kickLb), alignY(kickLb)], "L");
+      }
+      // Y: if not already on left edge, cutoff help or stalk
+      const yra = ensureRole("y");
+      if (!yra.targetIds.length && rightEdge) {
+        // Y can help hinge/cutoff if TE is strong — otherwise leave note
+        yra.rule = "cutoff";
+        yra.usesGod = false;
+        yra.whyNotGod = "TE cutoff/hinge help is scheme, not pure GOD base.";
+        yra.why =
+          "Sell fake / help backside edge so the hinge isn't alone. POA is left — don't freestyle into the hole.";
+        yra.job = "Backside help / sell";
+        yra.path = pathHinge([OL_X.y!, OL_Y], [alignX(rightEdge), alignY(rightEdge)]);
       }
     } else {
-      // Full counter G+T pull
-      if (kickLb) {
-        setDefEng(
-          kickLb,
-          ["rg", "rt"],
-          `Dual pull: G lead + T trail on ${kickLb.tag}.`,
-          true,
+      // Full counter: RT pulls trail; Y owns right edge
+      stripOl("rt");
+      if (kickLb && wrapLb && kickLb.id !== wrapLb.id) {
+        // Trail RT wraps hole with FB (already set engagers) or kicks if only one LB
+        const ra = ensureRole("rt");
+        ra.rule = "pull";
+        ra.usesGod = false;
+        ra.whyNotGod = "Puller leaves GOD base.";
+        ra.why = `Trail puller — wrap ${wrapLb.tag} behind RG's kick.`;
+        ra.targetIds = [wrapLb.id];
+        ra.targetTags = [wrapLb.tag];
+        ra.job = `Trail wrap ${wrapLb.tag}`;
+        ra.path = pathPull(
+          [OL_X.rt!, OL_Y],
+          [alignX(wrapLb), alignY(wrapLb)],
+          "L",
         );
-        for (const ol of ["rg", "rt"] as const) {
-          const ra = ensureRole(ol);
-          ra.rule = "pull";
-          ra.usesGod = false;
-          ra.whyNotGod = "Pullers leave GOD base gaps.";
-          ra.why =
-            ol === "rg"
-              ? `Lead puller — kick ${kickLb.tag}.`
-              : `Trail puller — wrap ${kickLb.tag} / second level.`;
-          ra.targetIds = [kickLb.id];
-          ra.targetTags = [kickLb.tag];
-          ra.job = ol === "rg" ? `Lead pull ${kickLb.tag}` : `Trail wrap ${kickLb.tag}`;
-          ra.path = pathPull([OL_X[ol]!, 52], [alignX(kickLb), alignY(kickLb)], "L");
-        }
+      } else if (kickLb) {
+        const ra = ensureRole("rt");
+        ra.rule = "pull";
+        ra.usesGod = false;
+        ra.whyNotGod = "Puller leaves GOD base.";
+        ra.why = `Trail pull — work ${kickLb.tag} with lead.`;
+        ra.targetIds = [kickLb.id];
+        ra.targetTags = [kickLb.tag];
+        ra.job = `Trail ${kickLb.tag}`;
+        ra.path = pathPull(
+          [OL_X.rt!, OL_Y],
+          [alignX(kickLb), alignY(kickLb)],
+          "L",
+        );
       }
       if (rightEdge) {
         setDefEng(
           rightEdge,
           ["y"],
-          `Backside cutoff: Y vs ${rightEdge.tag} (both G+T left).`,
+          `Backside cutoff: Y vs ${rightEdge.tag} (G+T both pulled).`,
           false,
         );
+        const yra = ensureRole("y");
+        yra.rule = "cutoff";
+        yra.usesGod = false;
+        yra.whyNotGod = "Cutoff replaces hinge when both G and T leave.";
+        yra.why = `Both pullers left — you are the backside edge on ${rightEdge.tag}.`;
+        yra.targetIds = [rightEdge.id];
+        yra.targetTags = [rightEdge.tag];
+        yra.job = `Cutoff ${rightEdge.tag}`;
+        yra.path = pathBase(
+          [OL_X.y!, OL_Y],
+          [alignX(rightEdge), alignY(rightEdge)],
+        );
+      }
+    }
+
+    // Annotate any remaining unblocked first-level DL in the box (should be none interior)
+    for (const dl of dls) {
+      if (dl.engagedBy.length === 0) {
+        dl.job = `${dl.tag} UNBLOCKED — scheme error risk at ${alignX(dl).toFixed(0)}. Re-check wall/block-back.`;
+      }
+    }
+    // Backside LBs away from POA may be free — justify
+    for (const lb of lbs) {
+      if (lb.engagedBy.length === 0) {
+        const away = alignX(lb) > 58;
+        lb.job = away
+          ? `${lb.tag} free away from POA (counter left) — accepted; not in the crease.`
+          : `${lb.tag} free near box — FB/puller must account; scrape risk.`;
       }
     }
   } else if (scheme === "reach") {
