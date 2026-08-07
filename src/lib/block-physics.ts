@@ -66,12 +66,19 @@ export const HITBOX = {
   db: 1.1,
 } as const;
 
-/** Latch grab when blocker within this distance (field units) */
-const GRAB_LATCH = 5.8;
-/** Once latched, hold unless separation exceeds this (sticky) */
-const GRAB_HOLD = 11;
+/**
+ * Latch grab only at true contact — blocker must close to pad distance.
+ * (~ sum of OL+DL radii + tiny slack). No long-range "magnet" grabs.
+ */
+const GRAB_LATCH = 2.7;
+/** Sticky hold after latch; still modest so broken blocks can release */
+const GRAB_HOLD = 5.2;
 /** Pad standoff once attached (blocker chest → defender pads) */
-const GRAB_PAD = 2.35;
+const GRAB_PAD = 2.15;
+/** Blocker must leave their snap mark at least this far before latching */
+const GRAB_MIN_BLOCKER_MOVE = 1.15;
+/** Second man on a double must also be this close to join the grab */
+const GRAB_DOUBLE_LATCH = 3.0;
 /** Max yards a grab can drive a defender from home */
 const GRAB_MAX_DRIVE = 9;
 
@@ -347,6 +354,13 @@ export function sampleBlockPhysics(
     };
   });
 
+  /** Snap landmarks so grab requires the blocker to actually fire out */
+  const oSnap = new Map<string, Vec>();
+  for (const role of play.roles) {
+    const p = role.path[0];
+    if (p) oSnap.set(role.id, v(p[0], p[1]));
+  }
+
   let lastBall = v(50, 56);
 
   for (let step = 0; step < steps; step++) {
@@ -375,19 +389,27 @@ export function sampleBlockPhysics(
         .map((id) => byId.get(id))
         .filter(Boolean) as { id: string; pos: Vec; vel: Vec }[];
 
-      // --- Grab latch / hold ---
+      // --- Grab latch / hold (close contact only + blocker has fired out) ---
       if (!body.grab && assigned.length > 0) {
         const near = assigned
-          .map((o) => ({ o, d: len(sub(o.pos, body.pos)) }))
-          .filter((x) => x.d <= GRAB_LATCH)
+          .map((o) => {
+            const d = len(sub(o.pos, body.pos));
+            const snap = oSnap.get(o.id);
+            const moved = snap
+              ? len(sub(o.pos, snap)) >= GRAB_MIN_BLOCKER_MOVE
+              : gT > 0.06;
+            return { o, d, moved };
+          })
+          .filter((x) => x.d <= GRAB_LATCH && x.moved)
           .sort((a, b) => a.d - b.d);
         if (near.length > 0) {
-          // Latch on closest; include second if double assignment and close
+          // Latch on closest; second man only if truly in the double
           const holders = [near[0]!.o.id];
           if (
             (body.def.doubleTeam || assigned.length >= 2) &&
             near[1] &&
-            near[1].d <= GRAB_LATCH + 1.5
+            near[1].d <= GRAB_DOUBLE_LATCH &&
+            near[1].moved
           ) {
             holders.push(near[1].o.id);
           }
@@ -432,10 +454,14 @@ export function sampleBlockPhysics(
             for (const o of assigned) {
               if (
                 !body.grab.holders.includes(o.id) &&
-                len(sub(o.pos, body.pos)) <= GRAB_LATCH &&
+                len(sub(o.pos, body.pos)) <= GRAB_DOUBLE_LATCH &&
                 body.grab.holders.length < 2
               ) {
-                body.grab.holders.push(o.id);
+                const snap = oSnap.get(o.id);
+                const moved = snap
+                  ? len(sub(o.pos, snap)) >= GRAB_MIN_BLOCKER_MOVE * 0.7
+                  : true;
+                if (moved) body.grab.holders.push(o.id);
               }
             }
           }
