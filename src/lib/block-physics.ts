@@ -71,16 +71,18 @@ export const HITBOX = {
  * (~ sum of OL+DL radii + tiny slack). No long-range "magnet" grabs.
  */
 const GRAB_LATCH = 2.7;
-/** Sticky hold after latch; still modest so broken blocks can release */
-const GRAB_HOLD = 5.2;
 /** Pad standoff once attached (blocker chest → defender pads) */
 const GRAB_PAD = 2.15;
 /** Blocker must leave their snap mark at least this far before latching */
 const GRAB_MIN_BLOCKER_MOVE = 1.15;
 /** Second man on a double must also be this close to join the grab */
 const GRAB_DOUBLE_LATCH = 3.0;
-/** Max yards a grab can drive a defender from home */
-const GRAB_MAX_DRIVE = 9;
+/**
+ * Once latched, grab is sticky for the rest of the play while holders exist.
+ * Only hard-break if every holder is gone (no distance-based release — that
+ * caused slide-off + snap-back when lag accumulated).
+ */
+const GRAB_HARD_BREAK = 14;
 
 export function hitboxOffense(roleId: string): number {
   const id = roleId.toLowerCase();
@@ -312,6 +314,11 @@ type DBody = {
   minY: number;
   /** Cumulative free travel distance (pace budget) */
   travelFree: number;
+  /**
+   * Free-play anchor. Starts at alignment; while grabbed it tracks the
+   * driven position so a release never yanks the D back to the snap mark.
+   */
+  freeAnchor: Vec;
 };
 
 export function sampleBlockPhysics(
@@ -351,6 +358,7 @@ export function sampleBlockPhysics(
       driveAxis: driveDir(def),
       minY: home.y,
       travelFree: 0,
+      freeAnchor: { ...home },
     };
   });
 
@@ -389,7 +397,7 @@ export function sampleBlockPhysics(
         .map((id) => byId.get(id))
         .filter(Boolean) as { id: string; pos: Vec; vel: Vec }[];
 
-      // --- Grab latch / hold (close contact only + blocker has fired out) ---
+      // --- Grab latch (close contact only + blocker has fired out) ---
       if (!body.grab && assigned.length > 0) {
         const near = assigned
           .map((o) => {
@@ -403,7 +411,6 @@ export function sampleBlockPhysics(
           .filter((x) => x.d <= GRAB_LATCH && x.moved)
           .sort((a, b) => a.d - b.d);
         if (near.length > 0) {
-          // Latch on closest; second man only if truly in the double
           const holders = [near[0]!.o.id];
           if (
             (body.def.doubleTeam || assigned.length >= 2) &&
@@ -414,68 +421,63 @@ export function sampleBlockPhysics(
             holders.push(near[1].o.id);
           }
           const center = holders.reduce(
-            (acc, id) => {
-              const o = byId.get(id)!;
-              return add(acc, o.pos);
-            },
+            (acc, id) => add(acc, byId.get(id)!.pos),
             v(0, 0),
           );
           const c = scale(center, 1 / holders.length);
-          // Initial offset: from centroid toward current D pos (pad along drive)
           let off = sub(body.pos, c);
-          if (len(off) < 0.4) {
-            off = scale(body.driveAxis, GRAB_PAD);
-          } else {
-            off = scale(norm(off), GRAB_PAD);
-          }
-          // Prefer drive-axis pad (blocker drives D along drive path)
-          const alongDrive = scale(body.driveAxis, GRAB_PAD);
-          off = lerp(off, alongDrive, 0.55);
+          if (len(off) < 0.4) off = scale(body.driveAxis, GRAB_PAD);
+          else off = scale(norm(off), GRAB_PAD);
+          off = lerp(off, scale(body.driveAxis, GRAB_PAD), 0.55);
           body.grab = { holders, offset: off, driveT: 0 };
           body.pressure = 0.55;
-        }
-      } else if (body.grab) {
-        // Maintain grab if any holder still assigned and within hold range
-        const live = body.grab.holders
-          .map((id) => byId.get(id))
-          .filter(Boolean) as { id: string; pos: Vec; vel: Vec }[];
-        if (live.length === 0) {
-          body.grab = null;
-        } else {
-          const center = scale(
-            live.reduce((a, o) => add(a, o.pos), v(0, 0)),
-            1 / live.length,
-          );
-          const dist = len(sub(body.pos, center));
-          if (dist > GRAB_HOLD) {
-            body.grab = null;
-          } else {
-            // Refresh holder list if second comes in
-            for (const o of assigned) {
-              if (
-                !body.grab.holders.includes(o.id) &&
-                len(sub(o.pos, body.pos)) <= GRAB_DOUBLE_LATCH &&
-                body.grab.holders.length < 2
-              ) {
-                const snap = oSnap.get(o.id);
-                const moved = snap
-                  ? len(sub(o.pos, snap)) >= GRAB_MIN_BLOCKER_MOVE * 0.7
-                  : true;
-                if (moved) body.grab.holders.push(o.id);
-              }
-            }
-          }
         }
       }
 
       if (body.grab) {
-        // ===== ATTACHED: blocker movement drives defender =====
-        const live = body.grab.holders
+        // Prefer currently assigned engagers that are still holders; allow
+        // re-bind to any assigned OL still near if original list went empty.
+        let live = body.grab.holders
           .map((id) => byId.get(id))
           .filter(Boolean) as { id: string; pos: Vec; vel: Vec }[];
+
+        if (live.length === 0 && assigned.length > 0) {
+          // Re-bind to nearest assigned rather than releasing to home
+          const sorted = assigned
+            .slice()
+            .sort((a, b) => len(sub(a.pos, body.pos)) - len(sub(b.pos, body.pos)));
+          body.grab.holders = [sorted[0]!.id];
+          if (
+            sorted[1] &&
+            (body.def.doubleTeam || assigned.length >= 2) &&
+            len(sub(sorted[1].pos, body.pos)) <= GRAB_DOUBLE_LATCH + 1
+          ) {
+            body.grab.holders.push(sorted[1].id);
+          }
+          live = body.grab.holders
+            .map((id) => byId.get(id))
+            .filter(Boolean) as { id: string; pos: Vec; vel: Vec }[];
+        }
+
         if (live.length === 0) {
+          // True release: keep displaced freeAnchor (no snap-back to snap mark)
           body.grab = null;
+          body.vel = scale(body.vel, 0.4);
         } else {
+          // Join second man if he arrives on the double
+          for (const o of assigned) {
+            if (
+              !body.grab.holders.includes(o.id) &&
+              body.grab.holders.length < 2 &&
+              len(sub(o.pos, body.pos)) <= GRAB_DOUBLE_LATCH
+            ) {
+              body.grab.holders.push(o.id);
+              live = body.grab.holders
+                .map((id) => byId.get(id))
+                .filter(Boolean) as { id: string; pos: Vec; vel: Vec }[];
+            }
+          }
+
           const isDouble = live.length >= 2 || Boolean(body.def.doubleTeam);
           const center = scale(
             live.reduce((a, o) => add(a, o.pos), v(0, 0)),
@@ -486,48 +488,52 @@ export function sampleBlockPhysics(
             1 / live.length,
           );
 
-          // Advance drive: offset migrates along drive axis as grab holds
-          const driveBoost = isDouble ? 1.25 : 1;
+          const driveBoost = isDouble ? 1.2 : 1;
           body.grab.driveT = Math.min(
             1,
-            body.grab.driveT + (dt / totalMs) * driveBoost * 1.4,
+            body.grab.driveT + (dt / totalMs) * driveBoost * 1.25,
           );
 
-          // Desired pad: in front of blockers along drive (+ a bit of blocker velocity)
-          const padBase = scale(body.driveAxis, GRAB_PAD + body.grab.driveT * 1.2);
-          // Lateral: stay centered on holder cluster
-          const desiredOff = padBase;
-          body.grab.offset = lerp(body.grab.offset, desiredOff, isDouble ? 0.18 : 0.12);
+          // Offset eases along drive axis — defender stays on the blocker's pads
+          const padLen = GRAB_PAD + body.grab.driveT * 1.4;
+          const desiredOff = scale(body.driveAxis, padLen);
+          body.grab.offset = lerp(
+            body.grab.offset,
+            desiredOff,
+            isDouble ? 0.22 : 0.16,
+          );
 
-          // Target world pos = holder centroid + offset
+          // KINEMATIC attach: position IS center + offset every tick.
+          // Blocker movement inherently updates defender — no lag slip-off.
           let target = add(center, body.grab.offset);
-          // Cap drive distance from home
-          const fromHome = sub(target, body.home);
-          if (len(fromHome) > GRAB_MAX_DRIVE) {
-            target = add(body.home, scale(norm(fromHome), GRAB_MAX_DRIVE));
+          // Ratchet: never move back toward the LOS once driven
+          body.minY = Math.min(body.minY, target.y, body.pos.y);
+          if (target.y > body.minY + 0.35) {
+            target = v(target.x, body.minY + 0.35);
+            // Keep offset consistent with seated y
+            body.grab.offset = sub(target, center);
           }
 
-          // Snap-follow with lag (grab attachment, not collision bounce)
-          const toTarget = sub(target, body.pos);
-          const follow = isDouble ? 0.42 : 0.32;
-          body.vel = add(scale(body.vel, 0.35), scale(toTarget, follow));
-          // Inherit blocker push
-          body.vel = add(body.vel, scale(avgVel, isDouble ? 0.55 : 0.4));
-          body.vel = clampMag(
-            body.vel,
-            grabSpeed(body.level, isDouble),
+          // Hard re-seat if somehow separated (never drop the grab for distance)
+          if (len(sub(body.pos, center)) > GRAB_HARD_BREAK) {
+            body.grab.offset = scale(body.driveAxis, GRAB_PAD);
+            target = add(center, body.grab.offset);
+          }
+
+          const prev = { x: body.pos.x, y: body.pos.y };
+          body.pos = clampField(target);
+          // Velocity tracks blockers so contacts/render stay smooth
+          body.vel = add(
+            scale(avgVel, 0.85),
+            scale(sub(body.pos, prev), 0.4),
           );
-          body.pos = clampField(add(body.pos, body.vel));
-          // Ratchet drive: don't rebound toward the LOS after being driven
-          body.minY = Math.min(body.minY, body.pos.y);
-          if (body.pos.y > body.minY + 0.9) {
-            body.pos.y = body.minY + 0.9;
-            if (body.vel.y > 0) body.vel.y *= 0.2;
-          }
+          body.vel = clampMag(body.vel, grabSpeed(body.level, isDouble) * 1.4);
 
+          // Displaced free anchor = current driven seat (prevents home snap)
+          body.freeAnchor = { x: body.pos.x, y: body.pos.y };
           body.pressure = Math.min(
             1,
-            0.5 + body.grab.driveT * 0.45 + (isDouble ? 0.15 : 0),
+            0.55 + body.grab.driveT * 0.4 + (isDouble ? 0.15 : 0),
           );
           continue;
         }
@@ -572,13 +578,15 @@ export function sampleBlockPhysics(
       }
       body.travelFree += len(sub(next, before));
 
-      // Alignment leash (role depth)
+      // Alignment leash from freeAnchor (displaced if previously blocked)
       const leash = maxFromHomeFree(body.level);
-      const homeDelta = sub(next, body.home);
-      if (len(homeDelta) > leash) {
-        next = add(body.home, scale(norm(homeDelta), leash));
+      const anchorDelta = sub(next, body.freeAnchor);
+      if (len(anchorDelta) > leash) {
+        next = add(body.freeAnchor, scale(norm(anchorDelta), leash));
         body.vel = scale(body.vel, 0.35);
       }
+      // Soft drift of freeAnchor so post-block pursuit stays local
+      body.freeAnchor = lerp(body.freeAnchor, next, 0.08);
 
       body.pos = clampField(next);
     }
@@ -708,19 +716,21 @@ function freePaceForce(
   }
 
   if (body.level === "lb") {
-    // Read: hold depth, eyes on mesh — small shuffle only
+    // Hold near freeAnchor (may be post-block displaced), not snap mark
+    const ax = body.freeAnchor.x;
+    const ay = body.freeAnchor.y;
     const hold = v(
-      (body.home.x - body.pos.x) * 0.04,
-      (body.home.y - 0.4 - body.pos.y) * 0.035,
+      (ax - body.pos.x) * 0.04,
+      (ay - 0.3 - body.pos.y) * 0.035,
     );
     // Scrape to flow first, ball second (coaching order)
-    const scrapeTarget = body.home.x * (1 - 0.5 * fitT) + flowX * 0.25 * fitT + lead.x * 0.25 * fitT;
+    const scrapeTarget = ax * (1 - 0.5 * fitT) + flowX * 0.25 * fitT + lead.x * 0.25 * fitT;
     const scrape = v((scrapeTarget - body.pos.x) * (0.03 + 0.04 * fitT), 0);
     // Downhill only after read and only if ball is past LOS threat
     const ballThreat = ball.y < body.home.y + 6 || fitT > 0.4;
     const downhill =
       ballThreat && fitT > 0.15
-        ? v(0, (Math.min(lead.y + 3, body.home.y + 1.5) - body.pos.y) * 0.03 * fitT)
+        ? v(0, (Math.min(lead.y + 3, ay + 1.5) - body.pos.y) * 0.03 * fitT)
         : v(0, 0);
     const close =
       fitT > 0.35 && dist < 12 ? scale(dir, 0.03 * fitT) : v(0, 0);
