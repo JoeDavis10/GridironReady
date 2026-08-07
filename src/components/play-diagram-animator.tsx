@@ -261,6 +261,8 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
   /** Immersive: phase coaching collapsed so diagram owns the screen */
   const [showPhasePanel, setShowPhasePanel] = useState(false);
   const [showImmersiveOpts, setShowImmersiveOpts] = useState(false);
+  /** Player bubble size multiplier (0.6–2). Affects OL + D markers for clarity. */
+  const [bubbleScale, setBubbleScale] = useState(1);
   const shellRef = useRef<HTMLDivElement>(null);
 
   const rafRef = useRef<number | null>(null);
@@ -457,7 +459,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
 
   /** Display positions with deconflict so pullers don't bury under OL */
   const displayPos = useMemo(() => {
-    const scale = immersive ? 1.2 : 1.08;
+    const scale = (immersive ? 1.2 : 1.08) * bubbleScale;
     const items: {
       id: string;
       x: number;
@@ -483,7 +485,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
       });
     }
     return deconflictPositions(items);
-  }, [roleStates, focusRoleId, phaseIndex, immersive]);
+  }, [roleStates, focusRoleId, phaseIndex, immersive, bubbleScale]);
 
   const rolePosById = useMemo(() => {
     const m = new Map<string, [number, number]>();
@@ -549,7 +551,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
     });
   }, [roleStates, focusRoleId]);
 
-  const S = immersive ? 1.2 : 1.08;
+  const S = (immersive ? 1.2 : 1.08) * bubbleScale;
   const pathW = (base: number) => base * S;
   const fontS = (base: number) => base * S;
 
@@ -1117,6 +1119,59 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
             "mt-auto shrink-0 border-t border-[var(--color-border)] bg-[color-mix(in_oklab,var(--color-bg)_97%,transparent)] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md",
         )}
       >
+        <label
+          className={cn(
+            "flex w-full min-w-0 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5",
+            immersive && "py-1",
+          )}
+        >
+          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--color-subtle)]">
+            Size
+          </span>
+          <span
+            className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-[8px] font-bold text-[var(--color-primary-fg)]"
+            aria-hidden
+            style={{
+              transform: `scale(${0.65 + bubbleScale * 0.35})`,
+            }}
+          >
+            O
+          </span>
+          <input
+            type="range"
+            min={0.6}
+            max={2}
+            step={0.05}
+            value={bubbleScale}
+            onChange={(e) => setBubbleScale(Number(e.target.value))}
+            aria-label="Player bubble size"
+            className={cn(
+              "min-w-0 flex-1 cursor-pointer appearance-none bg-transparent",
+              "[&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-runnable-track]:rounded-full",
+              "[&::-webkit-slider-runnable-track]:bg-[var(--color-border-strong)]",
+              "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:mt-[-5px]",
+              "[&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full",
+              "[&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[var(--color-bg)]",
+              "[&::-webkit-slider-thumb]:bg-[var(--color-primary)]",
+              "[&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full",
+              "[&::-moz-range-track]:bg-[var(--color-border-strong)]",
+              "[&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full",
+              "[&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-[var(--color-primary)]",
+            )}
+          />
+          <span className="w-9 shrink-0 text-right text-[11px] font-semibold tabular-nums text-[var(--color-muted)]">
+            {Math.round(bubbleScale * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={() => setBubbleScale(1)}
+            className="h-7 shrink-0 rounded-full border border-[var(--color-border)] px-2 text-[10px] font-semibold text-[var(--color-muted)] touch-manipulation disabled:opacity-40"
+            disabled={Math.abs(bubbleScale - 1) < 0.01}
+            aria-label="Reset bubble size"
+          >
+            Reset
+          </button>
+        </label>
         <div
           className={cn(
             "flex w-full min-w-0 flex-wrap items-center gap-2",
