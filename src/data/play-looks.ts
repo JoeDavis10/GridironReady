@@ -299,7 +299,7 @@ export function buildFrontAlignments(frontId: DefFrontId): LookDefender[] {
     d("look-sam", "S", "Stack S", [64, lb], "Stacked · 4 yd"),
     d("look-ss", "SS", "Apex", [70, 40], "Apex / force"),
     fs, cbL, cbR,
-    d("look-cb-slot", "N", "Slot", [72, 48], "Slot / edge"),
+    d("look-nick-r", "NB", "Nickel", [72, 48], "Slot nickel — not DL"),
   ];
 }
 
@@ -343,14 +343,82 @@ function cloneDefs(defs: LookDefender[]): LookDefender[] {
   }));
 }
 
-function isDl(tag: string): boolean {
-  const t = tag.toUpperCase();
-  return t === "E" || t === "T" || t === "N";
+/** Defensive levels for GOD — secondary/nickel must NEVER count as On for OL. */
+export type DefLevel = "dl" | "lb" | "db";
+
+/**
+ * Classify by id + depth first, tags only as last resort.
+ * Critical: tag "N" alone is ambiguous (Nose vs Nickel) — depth/id decides.
+ */
+export function classifyDefender(def: LookDefender): DefLevel {
+  const id = def.id.toLowerCase();
+  const tag = def.tag.toUpperCase();
+  const depth = LOS_Y - alignY(def); // yards off LOS
+
+  // Explicit id roles
+  if (
+    id.includes("nick") ||
+    id.includes("slot") ||
+    id.includes("cb") ||
+    id.includes("fs") ||
+    id.includes("ss") ||
+    id.includes("safety")
+  ) {
+    return "db";
+  }
+  if (
+    id.includes("will") ||
+    id.includes("mike") ||
+    id.includes("sam") ||
+    id.includes("-lb") ||
+    id.endsWith("lb") ||
+    id.includes("ilb") ||
+    id.includes("olb")
+  ) {
+    return "lb";
+  }
+  if (
+    id.includes("de-") ||
+    id.includes("dt-") ||
+    id.includes("edge") ||
+    id.includes("nose") ||
+    id.includes("look-de") ||
+    id.includes("look-dt")
+  ) {
+    return "dl";
+  }
+
+  // Tag-based (safe tags)
+  if (tag === "CB" || tag === "FS" || tag === "SS" || tag === "NB" || tag === "$" || tag === "NIC") {
+    return "db";
+  }
+  if (tag === "M" || tag === "W" || tag === "S" || tag === "LB" || tag === "ILB" || tag === "OLB") {
+    return "lb";
+  }
+  if (tag === "E" || tag === "T" || tag === "NT" || tag === "DT" || tag === "DE") {
+    return "dl";
+  }
+
+  // Ambiguous "N": Nose if on LOS, Nickel/DB if off ball / wide
+  if (tag === "N") {
+    if (depth <= 2.2 && Math.abs(alignX(def) - 50) < 18) return "dl";
+    return "db";
+  }
+
+  // Geometry fallback for custom drag
+  if (depth <= 2.2) return "dl";
+  if (depth <= 6.5) return "lb";
+  return "db";
 }
 
-function isLb(tag: string): boolean {
-  const t = tag.toUpperCase();
-  return t === "M" || t === "W" || t === "S";
+function isDl(def: LookDefender): boolean {
+  return classifyDefender(def) === "dl";
+}
+function isLb(def: LookDefender): boolean {
+  return classifyDefender(def) === "lb";
+}
+function isDb(def: LookDefender): boolean {
+  return classifyDefender(def) === "db";
 }
 
 function alignX(def: LookDefender): number {
@@ -359,6 +427,16 @@ function alignX(def: LookDefender): number {
 function alignY(def: LookDefender): number {
   return def.path[0]?.[1] ?? 48;
 }
+
+function dist2d(ax: number, ay: number, bx: number, by: number): number {
+  const dx = ax - bx;
+  const dy = ay - by;
+  return Math.hypot(dx, dy);
+}
+
+/** OL landmark y (helmet line) */
+const OL_Y = 52;
+
 
 function gapLabelForOl(ol: string, playside: "L" | "R"): string {
   // Playside gap name for teaching
@@ -391,64 +469,124 @@ export function evaluateAssignments(
   const ps = playsideOf(scheme);
   const godScheme = schemeUsesGod(scheme);
 
+  // ONLY true down linemen count for GOD On. LBs / nickel / CBs never.
   const dls = defs
-    .filter((d) => isDl(d.tag))
+    .filter((d) => isDl(d))
     .sort((a, b) => alignX(a) - alignX(b));
   const lbs = defs
-    .filter((d) => isLb(d.tag))
+    .filter((d) => isLb(d))
     .sort((a, b) => alignX(a) - alignX(b));
+  const dbs = defs.filter((d) => isDb(d));
 
   // Clear engagements
   for (const def of defs) {
     def.engagedBy = [];
     def.doubleTeam = false;
-    def.job = def.label;
+    def.job = `${def.label} · ${classifyDefender(def).toUpperCase()}`;
   }
 
-  // --- Gap map from DL geometry ---
-  // For each OL, find the DL in their "on" head-up zone (nearest by x within threshold)
-  const COVER_THRESH = 5.5; // yards — head-up / shade window
+  /**
+   * GOD distance model
+   * - On: nearest DL by 2D distance to OL landmark, exclusive claim first (closest pairs),
+   *       then residual OL may share a DL if still within COVER (combo surface).
+   * - Gap: playside gap name from OL slot + call side.
+   * - Down: when uncovered, nearest DL by distance that sits toward the ball / call
+   *       (not a wide secondary player — DL list only).
+   */
+  const COVER_THRESH = 6.0; // yards — head-up / shade On window
   const olToDl = new Map<string, LookDefender | null>();
   const dlToOl = new Map<string, string[]>();
 
+  // Pair distances OL↔DL
+  type Pair = { ol: string; dl: LookDefender; dist: number };
+  const pairs: Pair[] = [];
   for (const ol of OL_ORDER) {
+    const ox = OL_X[ol]!;
+    for (const dl of dls) {
+      pairs.push({
+        ol,
+        dl,
+        dist: dist2d(ox, OL_Y, alignX(dl), alignY(dl)),
+      });
+    }
+  }
+  pairs.sort((a, b) => a.dist - b.dist);
+
+  // Pass 1: exclusive On — each OL and each DL claimed at most once if within COVER
+  const olClaimed = new Set<string>();
+  const dlClaimed = new Set<string>();
+  for (const p of pairs) {
+    if (p.dist > COVER_THRESH) break;
+    if (olClaimed.has(p.ol) || dlClaimed.has(p.dl.id)) continue;
+    olClaimed.add(p.ol);
+    dlClaimed.add(p.dl.id);
+    olToDl.set(p.ol, p.dl);
+    dlToOl.set(p.dl.id, [p.ol]);
+  }
+
+  // Pass 2: residual OL within COVER of a claimed DL → shared surface (combo candidate)
+  for (const ol of OL_ORDER) {
+    if (olToDl.has(ol)) continue;
     const ox = OL_X[ol]!;
     let best: LookDefender | null = null;
     let bestD = Infinity;
     for (const dl of dls) {
-      const dx = Math.abs(alignX(dl) - ox);
-      if (dx < bestD) {
-        bestD = dx;
+      const dist = dist2d(ox, OL_Y, alignX(dl), alignY(dl));
+      if (dist < bestD) {
+        bestD = dist;
         best = dl;
       }
     }
     if (best && bestD <= COVER_THRESH) {
       olToDl.set(ol, best);
       const list = dlToOl.get(best.id) ?? [];
-      list.push(ol);
+      if (!list.includes(ol)) list.push(ol);
       dlToOl.set(best.id, list);
     } else {
       olToDl.set(ol, null); // uncovered
     }
   }
 
-  // Build gap landmarks between DL
+  // Build gap landmarks between DL only (true front)
   const gaps: AssignmentReport["gaps"] = [];
+  // Named gaps relative to OL landmarks
+  const gapAnchors: { label: string; x: number }[] = [
+    { label: "D weak", x: 32 },
+    { label: "C weak", x: 41 },
+    { label: "B weak", x: 47 },
+    { label: "A weak", x: 50 },
+    { label: "A strong", x: 50 },
+    { label: "B strong", x: 53 },
+    { label: "C strong", x: 59 },
+    { label: "D strong", x: 68 },
+  ];
   for (let i = 0; i < dls.length - 1; i++) {
     const a = dls[i]!;
     const b = dls[i + 1]!;
     const mid = (alignX(a) + alignX(b)) / 2;
     const width = alignX(b) - alignX(a);
-    let label = "gap";
-    if (mid < 44) label = "B/C weak";
-    else if (mid < 50) label = "A weak";
-    else if (mid < 56) label = "A strong";
-    else label = "B/C strong";
+    const nearestAnchor =
+      gapAnchors.slice().sort((g1, g2) => Math.abs(g1.x - mid) - Math.abs(g2.x - mid))[0]!;
     gaps.push({
       id: `gap-${a.id}-${b.id}`,
-      label: `${label} (${width.toFixed(0)} yd)`,
+      label: `${nearestAnchor.label} ${width.toFixed(1)}yd (${a.tag}-${b.tag})`,
       x: mid,
-      covered: width < 6,
+      covered: width < 5.5,
+    });
+  }
+  // Outside edges
+  if (dls.length) {
+    gaps.unshift({
+      id: `gap-out-l-${dls[0]!.id}`,
+      label: `EMOL weak outside ${dls[0]!.tag}`,
+      x: alignX(dls[0]!) - 4,
+      covered: false,
+    });
+    gaps.push({
+      id: `gap-out-r-${dls[dls.length - 1]!.id}`,
+      label: `EMOL strong outside ${dls[dls.length - 1]!.tag}`,
+      x: alignX(dls[dls.length - 1]!) + 4,
+      covered: false,
     });
   }
 
@@ -484,121 +622,179 @@ export function evaluateAssignments(
 
   // --- Base GOD assignment for man/gap schemes ---
   const assignGodBase = () => {
-    // Covered: base the man on you
     for (const ol of OL_ORDER) {
-      const dl = olToDl.get(ol);
+      const dl = olToDl.get(ol) ?? null;
       const ra = ensureRole(ol);
       const gap = gapLabelForOl(ol, ps);
       ra.gap = gap;
+      const ox = OL_X[ol]!;
 
       if (dl) {
         const others = dlToOl.get(dl.id) ?? [ol];
+        const onDist = dist2d(ox, OL_Y, alignX(dl), alignY(dl));
         if (others.length === 1) {
-          // True 1-on-1 GOD base
           setDefEng(
             dl,
             [ol],
-            `GOD On: ${ol.toUpperCase()} bases ${dl.tag} (head-up/shade, ${Math.abs(alignX(dl) - OL_X[ol]!).toFixed(1)} yd). Gap ${gap}.`,
+            `GOD On: ${ol.toUpperCase()} bases ${dl.tag} (${onDist.toFixed(1)} yd). Gap ${gap}.`,
             false,
           );
           ra.rule = "god-base";
           ra.usesGod = true;
           ra.targetIds = [dl.id];
           ra.targetTags = [dl.tag];
-          ra.why = `You are COVERED. GOD = base the man On you (${dl.tag}). Your playside gap is ${gap}. Drive him — no freelancing.`;
-          ra.job = `Base ${dl.tag} · GOD On · gap ${gap}`;
-          ra.path = pathBase([OL_X[ol]!, 52], [alignX(dl), alignY(dl)]);
+          ra.why = `COVERED by distance. On = ${dl.tag} at ${onDist.toFixed(1)} yd (only DL in your On window). Gap ${gap}. Base him — do not freestyle to nickel/DB.`;
+          ra.job = `Base ${dl.tag} · On ${onDist.toFixed(1)}yd · gap ${gap}`;
+          ra.path = pathBase([ox, OL_Y], [alignX(dl), alignY(dl)]);
         } else {
-          // Shared surface — will resolve uncovered combo
-          // Mark temporarily; combo pass fixes
+          // Shared — combo in finalize
           ra.rule = "god-combo";
           ra.usesGod = true;
           ra.targetIds = [dl.id];
           ra.targetTags = [dl.tag];
-          ra.why = `Shared surface on ${dl.tag} with ${others.filter((x) => x !== ol).join("/").toUpperCase()}. GOD uncovered rules decide combo vs base.`;
-          ra.job = `Combo/${dl.tag}`;
+          ra.why = `Shared On surface: ${others.map((x) => x.toUpperCase()).join("+")} all nearest to ${dl.tag} (${onDist.toFixed(1)} yd). GOD combo/post rules.`;
+          ra.job = `Combo ${dl.tag}`;
         }
       } else {
-        // Uncovered — find down defender (nearest DL toward playside/center)
         const down = findDownDefender(ol, dls, ps);
         ra.rule = "god-down";
         ra.usesGod = true;
         if (down) {
+          const dd = dist2d(ox, OL_Y, alignX(down), alignY(down));
           ra.targetIds = [down.id];
           ra.targetTags = [down.tag];
-          ra.why = `You are UNCOVERED (no DL within ${COVER_THRESH} yd of your head). GOD Down: double the next down defender (${down.tag}) and climb to LB on flow.`;
-          ra.job = `Down double ${down.tag} → climb`;
-          ra.path = pathCombo([OL_X[ol]!, 52], [alignX(down), alignY(down)], nearestLb(lbs, OL_X[ol]!));
-          // Add to down's engagers
+          ra.why = `UNCOVERED (no DL within ${COVER_THRESH} yd On window). Down by distance = ${down.tag} at ${dd.toFixed(1)} yd — double him, climb LB on flow. Nickel/DB are not Down.`;
+          ra.job = `Down ${down.tag} ${dd.toFixed(1)}yd → climb`;
+          ra.path = pathCombo(
+            [ox, OL_Y],
+            [alignX(down), alignY(down)],
+            nearestLb(lbs, ox),
+          );
           const list = [...down.engagedBy];
           if (!list.includes(ol)) list.push(ol);
           setDefEng(
             down,
             list,
-            `GOD Down double: ${list.map((x) => x.toUpperCase()).join("+")} on ${down.tag}. Climb LB on flow.`,
+            `GOD Down: ${list.map((x) => x.toUpperCase()).join("+")} on ${down.tag} (${dd.toFixed(1)} yd).`,
             list.length >= 2,
           );
         } else {
-          ra.why = "Uncovered with no clear down man — climb first color (LB) in your gap.";
+          ra.why =
+            "Uncovered and no DL on the field — climb first LB color in your gap (no first-level On).";
           ra.job = "Climb first color";
-          ra.path = pathClimb([OL_X[ol]!, 52], nearestLb(lbs, OL_X[ol]!));
+          ra.path = pathClimb([ox, OL_Y], nearestLb(lbs, ox));
         }
       }
     }
 
-    // Finalize shared-surface combos
+    // Combo finalize for multi-OL On
     for (const dl of dls) {
       const ols = dlToOl.get(dl.id) ?? [];
       if (ols.length >= 2) {
         setDefEng(
           dl,
           ols.slice(0, 2),
-          `GOD combo post: ${ols
+          `GOD combo: ${ols
             .slice(0, 2)
             .map((x) => x.toUpperCase())
-            .join("+")} share ${dl.tag} (two OL mapped nearest). Drive as one, peel on flow.`,
+            .join("+")} on ${dl.tag} (shared On by distance).`,
           true,
         );
         for (const ol of ols) {
           const ra = ensureRole(ol);
+          const partner = ols.find((x) => x !== ol);
+          const onDist = dist2d(OL_X[ol]!, OL_Y, alignX(dl), alignY(dl));
           ra.rule = "god-combo";
           ra.usesGod = true;
           ra.targetIds = [dl.id];
           ra.targetTags = [dl.tag];
-          const partner = ols.find((x) => x !== ol);
-          ra.why = `Two OL nearest to ${dl.tag}. GOD combo: post with ${partner?.toUpperCase() ?? "partner"}, climb LB when he shows.`;
+          ra.why = `Combo On ${dl.tag} (${onDist.toFixed(1)} yd) with ${partner?.toUpperCase() ?? "partner"}. Drive as one; one climbs LB on flow.`;
           ra.job = `Combo ${dl.tag} w/ ${partner?.toUpperCase() ?? "?"}`;
           ra.path = pathCombo(
-            [OL_X[ol]!, 52],
+            [OL_X[ol]!, OL_Y],
             [alignX(dl), alignY(dl)],
             nearestLb(lbs, OL_X[ol]!),
           );
         }
+      } else if (ols.length === 1 && dl.engagedBy.length === 0) {
+        // Ensure engagement applied
+        setDefEng(
+          dl,
+          ols,
+          `GOD On: ${ols[0]!.toUpperCase()} bases ${dl.tag}.`,
+          false,
+        );
       }
     }
 
-    // Edge DLs not claimed: assign EMOL
+    // Unclaimed DL: only true EMOL (outermost) → nearest end OL by distance, never force RT to nickel
     for (const dl of dls) {
-      if (dl.engagedBy.length === 0) {
-        const edgeOl = alignX(dl) < 50 ? "lt" : "rt";
+      if (dl.engagedBy.length > 0) continue;
+      // Only outermost DLs get edge claim
+      const isLeftEdge = dls[0]?.id === dl.id;
+      const isRightEdge = dls[dls.length - 1]?.id === dl.id;
+      if (!isLeftEdge && !isRightEdge) {
+        // Interior unclaimed — nearest OL by distance as secondary On
+        let bestOl: (typeof OL_ORDER)[number] = "c";
+        let bestD = Infinity;
+        for (const ol of OL_ORDER) {
+          const dist = dist2d(OL_X[ol]!, OL_Y, alignX(dl), alignY(dl));
+          if (dist < bestD) {
+            bestD = dist;
+            bestOl = ol;
+          }
+        }
         setDefEng(
           dl,
-          [edgeOl],
-          `GOD edge: ${edgeOl.toUpperCase()} owns EMOL ${dl.tag} (${Math.abs(alignX(dl) - OL_X[edgeOl]!).toFixed(1)} yd outside).`,
+          [bestOl],
+          `GOD residual On by distance: ${bestOl.toUpperCase()} → ${dl.tag} (${bestD.toFixed(1)} yd).`,
           false,
         );
-        const ra = ensureRole(edgeOl);
+        const ra = ensureRole(bestOl);
         if (!ra.targetIds.includes(dl.id)) {
           ra.targetIds.push(dl.id);
           ra.targetTags.push(dl.tag);
         }
-        if (ra.rule === "none" || ra.rule === "god-base") {
-          ra.rule = "god-base";
-          ra.usesGod = true;
-          ra.why = `Edge defender ${dl.tag} is your On/EMOL. GOD: base or hinge per call.`;
-          ra.job = `Edge ${dl.tag}`;
-          ra.path = pathBase([OL_X[edgeOl]!, 52], [alignX(dl), alignY(dl)]);
-        }
+        continue;
+      }
+      const edgeOl = isLeftEdge ? "lt" : "rt";
+      const dist = dist2d(OL_X[edgeOl]!, OL_Y, alignX(dl), alignY(dl));
+      // Cap: if EMOL is absurdly wide (>14 yd), leave unassigned to OL (force/SS problem, not RT base)
+      if (dist > 14) {
+        dl.job = `${dl.tag} too wide for OL On (${dist.toFixed(1)} yd) — force/perimeter, not GOD base.`;
+        continue;
+      }
+      setDefEng(
+        dl,
+        [edgeOl],
+        `GOD EMOL On by distance: ${edgeOl.toUpperCase()} → ${dl.tag} (${dist.toFixed(1)} yd).`,
+        false,
+      );
+      const ra = ensureRole(edgeOl);
+      if (!ra.targetIds.includes(dl.id)) {
+        ra.targetIds = [dl.id];
+        ra.targetTags = [dl.tag];
+      }
+      if (ra.rule === "none" || (ra.rule === "god-base" && ra.targetIds[0] === dl.id)) {
+        ra.rule = "god-base";
+        ra.usesGod = true;
+        ra.why = `EMOL by distance: ${dl.tag} is outermost DL at ${dist.toFixed(1)} yd. Your On. (Secondary/nickel ignored.)`;
+        ra.job = `EMOL ${dl.tag} ${dist.toFixed(1)}yd`;
+        ra.path = pathBase([OL_X[edgeOl]!, OL_Y], [alignX(dl), alignY(dl)]);
+      }
+    }
+
+    // Mark DBs so they never show OL engagement from residual
+    for (const db of dbs) {
+      if (db.engagedBy.some((id) => OL_ORDER.includes(id as (typeof OL_ORDER)[number]))) {
+        // Strip accidental OL engagement on DBs
+        db.engagedBy = db.engagedBy.filter(
+          (id) => !OL_ORDER.includes(id as (typeof OL_ORDER)[number]),
+        );
+        db.doubleTeam = false;
+      }
+      if (db.engagedBy.length === 0) {
+        db.job = `${db.label} · DB — not a GOD On for OL`;
       }
     }
   };
@@ -663,18 +859,26 @@ export function evaluateAssignments(
     side: "L" | "R",
   ): LookDefender | null {
     const ox = OL_X[ol]!;
-    // Down = nearest DL toward the center / playside interior
+    // Down = nearest first-level DL by 2D distance, with a small bias toward the ball
+    // and a tiny bias toward playside. Never returns DB/LB.
     let best: LookDefender | null = null;
-    let bestD = Infinity;
+    let bestScore = Infinity;
     for (const dl of dlList) {
       const x = alignX(dl);
-      // Prefer DL inside toward ball
-      const towardCenter = Math.abs(x - 50) < Math.abs(ox - 50) + 2;
-      const dx = Math.abs(x - ox);
-      if (dx < 0.5) continue;
-      const score = dx + (towardCenter ? 0 : 3);
-      if (score < bestD) {
-        bestD = score;
+      const y = alignY(dl);
+      const dist = dist2d(ox, OL_Y, x, y);
+      const towardBall = Math.abs(x - 50) <= Math.abs(ox - 50) + 0.5 ? 0 : 1.25;
+      const playsideBias =
+        side === "R"
+          ? x >= ox - 1
+            ? 0
+            : 0.75
+          : x <= ox + 1
+            ? 0
+            : 0.75;
+      const score = dist + towardBall + playsideBias;
+      if (score < bestScore) {
+        bestScore = score;
         best = dl;
       }
     }
@@ -1050,10 +1254,11 @@ export function evaluateAssignments(
     }
   }
 
-  // Skill / secondary
+  // Skill / secondary — never OL GOD On
   for (const def of defs) {
-    if (isDl(def.tag) || isLb(def.tag)) continue;
-    if (def.tag === "CB" && alignX(def) < 50) {
+    if (isDl(def) || isLb(def)) continue;
+    const t = def.tag.toUpperCase();
+    if ((t === "CB" || t === "NB") && alignX(def) < 40) {
       setDefEng(def, ["x"], "Stalk / force — not GOD (skill).", false);
       const ra = ensureRole("x");
       ra.rule = "stalk";
@@ -1064,18 +1269,20 @@ export function evaluateAssignments(
       ra.targetTags = [def.tag];
       ra.job = "Stalk CB";
       ra.path = pathBase([OL_X.x!, 52], [alignX(def), alignY(def)]);
-    } else if (def.tag === "CB") {
-      setDefEng(def, ["z"], "Stalk / force — not GOD (skill).", false);
-      const ra = ensureRole("z");
+    } else if (t === "CB" || t === "NB") {
+      // Field CB or nickel — WR/TE stalk, NEVER RT base
+      const skill = alignX(def) > 70 ? "z" : "y";
+      setDefEng(def, [skill], "Perimeter / nickel — not GOD On for OL.", false);
+      const ra = ensureRole(skill);
       ra.rule = "stalk";
       ra.usesGod = false;
-      ra.whyNotGod = "WR stalk is not OL GOD.";
-      ra.why = "Stalk CB — mirror.";
+      ra.whyNotGod = "Nickel/CB is secondary. OL GOD only uses down linemen for On/Down.";
+      ra.why = `Stalk/force ${def.tag} — not a RT base assignment.`;
       ra.targetIds = [def.id];
       ra.targetTags = [def.tag];
-      ra.job = "Stalk CB";
-      ra.path = pathBase([OL_X.z!, 52], [alignX(def), alignY(def)]);
-    } else if (def.tag === "SS" || def.tag === "FS") {
+      ra.job = `Stalk ${def.tag}`;
+      ra.path = pathBase([OL_X[skill] ?? 84, 52], [alignX(def), alignY(def)]);
+    } else if (t === "SS" || t === "FS") {
       // leave mostly free unless empty
       if (def.engagedBy.length === 0) {
         def.job = def.tag === "FS" ? "Deep middle — late alley." : "Alley / force fold.";
