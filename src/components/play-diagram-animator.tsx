@@ -32,8 +32,11 @@ import {
 } from "@/data/play-looks";
 import {
   globalPlayProgress,
+  hitboxDefense,
+  hitboxOffense,
   sampleBlockPhysics,
 } from "@/lib/block-physics";
+import { classifyDefender } from "@/data/play-looks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -112,13 +115,13 @@ function deconflictPositions(
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const dist = Math.hypot(dx, dy) || 0.001;
-        const min = a.r + b.r + 0.75;
+        // Fixed hitbox seats — small shell, gentle correction (no UI-scale inflation)
+        const min = a.r + b.r + 0.35;
         if (dist < min) {
-          const push = (min - dist) / 2;
+          const push = (min - dist) * 0.45;
           const nx = dx / dist;
           const ny = dy / dist;
-          // lower priority moves more
-          const aW = a.priority >= b.priority ? 0.25 : 0.75;
+          const aW = a.priority >= b.priority ? 0.2 : 0.8;
           const bW = 1 - aW;
           a.x -= nx * push * aW;
           a.y -= ny * push * aW;
@@ -489,9 +492,11 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
     });
   }, [physics, look]);
 
-  /** Display positions with deconflict so pullers don't bury under OL */
+  /**
+   * Display deconflict uses FIXED field-unit hitboxes — never bubbleScale/zoom.
+   * Visual marker size can change; collision seats stay stable.
+   */
   const displayPos = useMemo(() => {
-    const scale = (immersive ? 1.2 : 1.08) * bubbleScale;
     const items: {
       id: string;
       x: number;
@@ -501,7 +506,8 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
     }[] = [];
     for (const s of roleStates) {
       const focused = focusRoleId === s.role.id;
-      const r = (s.pull ? 2.55 : focused ? 2.5 : 2.15) * scale;
+      // Physics-stable radius only (slight pad for readability, not UI scale)
+      const r = hitboxOffense(s.role.id) + (s.pull ? 0.25 : focused ? 0.2 : 0.1);
       items.push({
         id: s.role.id,
         x: s.pos[0],
@@ -517,7 +523,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
       });
     }
     return deconflictPositions(items);
-  }, [roleStates, focusRoleId, phaseIndex, immersive, bubbleScale]);
+  }, [roleStates, focusRoleId, phaseIndex]);
 
   const rolePosById = useMemo(() => {
     const m = new Map<string, [number, number]>();
@@ -983,6 +989,8 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                 !def.engagedBy.includes(focusRoleId) &&
                 focusLookId == null);
             const s = ((focusedNow ? 2.45 : 2.1) + pressure * 0.22) * S;
+            // True physics hitbox (field units) — independent of zoom / bubble size
+            const hb = hitboxDefense(classifyDefender(def));
             return (
               <g
                 key={def.id}
@@ -996,6 +1004,15 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                   setFocusLookId((cur) => (cur === def.id ? null : def.id));
                 }}
               >
+                {/* Fixed collision radius — does not scale with Size/Zoom UI */}
+                <circle
+                  r={hb}
+                  fill="none"
+                  stroke={DEF_STROKE}
+                  strokeWidth={0.12}
+                  opacity={0.28}
+                  vectorEffect="non-scaling-stroke"
+                />
                 {customMode && (
                   <circle r={s + 1.2} fill="none" stroke="var(--color-primary)" strokeWidth={0.3 * S} strokeDasharray="0.6 0.5" opacity={dragId === def.id ? 0.9 : 0.35} />
                 )}
@@ -1039,6 +1056,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                 : focusedNow
                   ? 2.65
                   : 2.25) * S;
+            const hb = hitboxOffense(role.id);
             const hue = roleColor(i);
             return (
               <g
@@ -1051,6 +1069,14 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                   setFocusRoleId((cur) => (cur === role.id ? null : role.id));
                 }}
               >
+                <circle
+                  r={hb}
+                  fill="none"
+                  stroke="var(--color-fg)"
+                  strokeWidth={0.12}
+                  opacity={0.2}
+                  vectorEffect="non-scaling-stroke"
+                />
                 {pull && (
                   <circle
                     r={r + 1.0 * S}
@@ -1121,6 +1147,10 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
             <span className="inline-flex items-center gap-1.5">
               <span className="h-0.5 w-3 shrink-0 rounded-full bg-[var(--color-warning,#e6a23c)]" />
               Drive path
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block size-2.5 shrink-0 rounded-full border border-[var(--color-muted)]" />
+              Hitbox (fixed)
             </span>
           </div>
         )}
@@ -1313,7 +1343,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
             immersive && "py-1",
           )}
         >
-          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--color-subtle)]">
+          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--color-subtle)]" title="Visual only — physics hitboxes stay fixed">
             Size
           </span>
           <span

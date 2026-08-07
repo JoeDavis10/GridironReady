@@ -45,9 +45,52 @@ export interface PhysicsFrame {
 
 const FIELD_MIN = 6;
 const FIELD_MAX = 94;
-const CONTACT_SHOW = 6.5;
-const ENGAGE_R = 10.5;
-const SEPARATION = 3.6;
+
+/**
+ * Fixed hitboxes in FIELD UNITS (≈ yards near LOS).
+ * These NEVER scale with diagram zoom or bubble-size UI.
+ * Visual markers may grow; collision math stays constant.
+ */
+export const HITBOX = {
+  /** Offensive lineman */
+  ol: 1.4,
+  /** Skill (RB/FB/WR/TE/QB) */
+  skill: 1.15,
+  /** Down lineman */
+  dl: 1.5,
+  /** Linebacker */
+  lb: 1.25,
+  /** Secondary */
+  db: 1.1,
+} as const;
+
+/** Soft shell outside the solid hitbox (contact cushion) */
+const SHELL = 0.35;
+/** Engage when centers closer than sum(radii) + this */
+const ENGAGE_SLACK = 7.5;
+/** Draw/contact line threshold beyond sum of radii */
+const CONTACT_PAD = 3.2;
+/** Soft collision stiffness (lower = less bounce) */
+const COLLIDE_K = 0.22;
+/** Velocity damping along collision normal */
+const COLLIDE_DAMP = 0.55;
+
+export function hitboxOffense(roleId: string): number {
+  const id = roleId.toLowerCase();
+  if (["lt", "lg", "c", "rg", "rt"].includes(id)) return HITBOX.ol;
+  return HITBOX.skill;
+}
+
+export function hitboxDefense(level: DefLevel): number {
+  if (level === "dl") return HITBOX.dl;
+  if (level === "lb") return HITBOX.lb;
+  return HITBOX.db;
+}
+
+/** Minimum center-to-center distance (solid + shell) */
+export function minSeparation(rA: number, rB: number): number {
+  return rA + rB + SHELL;
+}
 
 function v(x: number, y: number): Vec {
   return { x, y };
@@ -226,18 +269,21 @@ export function sampleBlockPhysics(
     for (const body of bodies) {
       body.pressure *= 0.9;
 
+      const myR = hitboxDefense(body.level);
       const nearEngagers = body.def.engagedBy
         .map((id) => {
           const o = byId.get(id);
           if (!o) return null;
           const d = len(sub(o.pos, body.pos));
-          return d <= ENGAGE_R ? { ...o, dist: d } : null;
+          const need = minSeparation(myR, hitboxOffense(id)) + ENGAGE_SLACK;
+          return d <= need ? { ...o, dist: d, r: hitboxOffense(id) } : null;
         })
         .filter(Boolean) as {
         id: string;
         pos: Vec;
         vel: Vec;
         dist: number;
+        r: number;
       }[];
 
       let force = v(0, 0);
@@ -277,34 +323,60 @@ export function sampleBlockPhysics(
         force = add(force, scale(toDrive, body.level === "dl" ? 0.28 : 0.2));
 
         // Secondary: stay on pads relative to OL (contact integrity)
+        // Fixed pad standoff = sum of hitboxes (zoom-independent)
+        const avgOR =
+          nearEngagers.reduce((s, e) => s + e.r, 0) / nearEngagers.length;
+        const padDist = minSeparation(myR, avgOR);
+        const engageMax = padDist + ENGAGE_SLACK;
+
         if (body.level === "dl") {
-          const pad = add(center, v(0, -2.4));
-          force = add(force, scale(sub(pad, body.pos), isDouble ? 0.14 : 0.1));
-          force = add(force, scale(avgVel, isDouble ? 0.08 : 0.05));
-          if (dist < 2.6 && dist > 1e-4) {
-            force = add(force, scale(norm(sub(body.pos, center)), 0.16));
+          const pad = add(center, v(0, -(padDist * 0.85)));
+          force = add(force, scale(sub(pad, body.pos), isDouble ? 0.12 : 0.09));
+          force = add(force, scale(avgVel, isDouble ? 0.07 : 0.045));
+          // Soft keep-out: only push when overlapping solid hitboxes
+          if (dist < padDist && dist > 1e-4) {
+            const pen = padDist - dist;
+            force = add(
+              force,
+              scale(norm(sub(body.pos, center)), pen * COLLIDE_K * 1.1),
+            );
           }
           body.pressure = Math.min(
             1,
-            body.pressure + (isDouble ? 0.22 : 0.14) * (1 - dist / ENGAGE_R),
+            body.pressure +
+              (isDouble ? 0.2 : 0.12) * Math.max(0, 1 - dist / engageMax),
           );
         } else if (body.level === "lb") {
-          // Meet blocker then ride their drive a short distance — no glue to RB
           const approach = norm(sub(center, body.home));
-          const meet = sub(center, scale(approach, 2.2));
-          force = add(force, scale(sub(meet, body.pos), 0.12));
-          force = add(force, scale(toDrive, 0.1));
-          if (dist < 4) {
-            force = add(force, scale(avgVel, 0.04));
-            if (dist < 3 && dist > 1e-4) {
-              force = add(force, scale(norm(sub(body.pos, center)), 0.14));
+          const meet = sub(center, scale(approach, padDist));
+          force = add(force, scale(sub(meet, body.pos), 0.1));
+          force = add(force, scale(toDrive, 0.08));
+          if (dist < padDist + 2) {
+            force = add(force, scale(avgVel, 0.035));
+            if (dist < padDist && dist > 1e-4) {
+              const pen = padDist - dist;
+              force = add(
+                force,
+                scale(norm(sub(body.pos, center)), pen * COLLIDE_K),
+              );
             }
-            body.pressure = Math.min(1, body.pressure + 0.16);
+            body.pressure = Math.min(1, body.pressure + 0.14);
           }
         } else {
-          // DB: soft mirror, still eases along short drive path
           force = add(force, scale(toDrive, 0.1));
-          force = add(force, scale(sub(add(center, v(center.x < 50 ? -2 : 2, -1.2)), body.pos), 0.06));
+          force = add(
+            force,
+            scale(
+              sub(add(center, v(center.x < 50 ? -2 : 2, -1.2)), body.pos),
+              0.06,
+            ),
+          );
+          if (dist < padDist && dist > 1e-4) {
+            force = add(
+              force,
+              scale(norm(sub(body.pos, center)), (padDist - dist) * COLLIDE_K * 0.8),
+            );
+          }
           body.pressure = Math.min(1, body.pressure + 0.06);
         }
       } else if (body.level === "dl") {
@@ -352,17 +424,55 @@ export function sampleBlockPhysics(
       }
     }
 
+    // Soft D↔D collisions — fixed hitboxes, damped (no zoom coupling)
     for (let i = 0; i < bodies.length; i++) {
       for (let j = i + 1; j < bodies.length; j++) {
         const a = bodies[i]!;
         const b = bodies[j]!;
+        const minD = minSeparation(
+          hitboxDefense(a.level),
+          hitboxDefense(b.level),
+        );
         const delta = sub(b.pos, a.pos);
         const d = len(delta);
-        if (d < SEPARATION && d > 1e-4) {
-          const n = scale(delta, 1 / d);
-          const push = (SEPARATION - d) * 0.42;
-          a.pos = clampField(sub(a.pos, scale(n, push * 0.5)));
-          b.pos = clampField(add(b.pos, scale(n, push * 0.5)));
+        if (d >= minD || d < 1e-4) continue;
+        const n = scale(delta, 1 / d);
+        const pen = minD - d;
+        // Mass-weighted positional correction (fraction of penetration)
+        const invA = 1 / a.mass;
+        const invB = 1 / b.mass;
+        const invSum = invA + invB;
+        const corr = pen * 0.55;
+        a.pos = clampField(sub(a.pos, scale(n, corr * (invA / invSum))));
+        b.pos = clampField(add(b.pos, scale(n, corr * (invB / invSum))));
+        // Kill closing velocity to prevent bounce oscillation
+        const rel = sub(b.vel, a.vel);
+        const closing = rel.x * n.x + rel.y * n.y; // b relative to a along n
+        if (closing < 0) {
+          const impulse = closing * COLLIDE_DAMP;
+          a.vel = add(a.vel, scale(n, impulse * (invA / invSum)));
+          b.vel = sub(b.vel, scale(n, impulse * (invB / invSum)));
+        }
+      }
+    }
+
+    // Soft O↔D solid keep-out for engaged pairs (fixed radii)
+    for (const body of bodies) {
+      const myR = hitboxDefense(body.level);
+      for (const oid of body.def.engagedBy) {
+        const o = byId.get(oid);
+        if (!o) continue;
+        const minD = minSeparation(myR, hitboxOffense(oid));
+        const delta = sub(body.pos, o.pos);
+        const d = len(delta);
+        if (d >= minD || d < 1e-4) continue;
+        const n = scale(delta, 1 / d);
+        const pen = minD - d;
+        // Defense yields more than scripted offense path (offense is kinematic)
+        body.pos = clampField(add(body.pos, scale(n, pen * 0.7)));
+        const vn = body.vel.x * n.x + body.vel.y * n.y;
+        if (vn < 0) {
+          body.vel = sub(body.vel, scale(n, vn * COLLIDE_DAMP));
         }
       }
     }
@@ -372,18 +482,20 @@ export function sampleBlockPhysics(
   const byId = new Map(offense.map((o) => [o.id, o]));
   const contacts: ContactSample[] = [];
   const defense: DefenseSample[] = bodies.map((body) => {
+    const myR = hitboxDefense(body.level);
     for (const oid of body.def.engagedBy) {
       const o = byId.get(oid);
       if (!o) continue;
       const d = len(sub(body.pos, o.pos));
-      if (d < CONTACT_SHOW) {
+      const show = minSeparation(myR, hitboxOffense(oid)) + CONTACT_PAD;
+      if (d < show) {
         contacts.push({
           offenseId: oid,
           defenseId: body.def.id,
           mid: [(o.pos.x + body.pos.x) / 2, (o.pos.y + body.pos.y) / 2],
           force: Math.min(
             1,
-            (CONTACT_SHOW - d) / CONTACT_SHOW + body.pressure * 0.35,
+            (show - d) / show + body.pressure * 0.35,
           ),
           double:
             body.def.engagedBy.length >= 2 || Boolean(body.def.doubleTeam),
