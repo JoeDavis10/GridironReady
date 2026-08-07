@@ -24,6 +24,8 @@ import {
 } from "@/data/plays";
 import {
   DEF_FRONTS,
+  HASH_L,
+  HASH_R,
   LB_Y,
   LOS_Y,
   buildSimPlay,
@@ -808,23 +810,60 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
             stroke="var(--color-border-strong)"
             strokeWidth={0.45 * S}
           />
+          {/* Yard lines every 5 yd — 1 unit = 1 yard from LOS (y=50) */}
+          {[20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80].map((y) => {
+            const fromLos = y - LOS_Y; // + offense, − defense
+            const isLos = y === LOS_Y;
+            const isFive = Math.abs(fromLos) % 5 === 0;
+            const isTen = Math.abs(fromLos) % 10 === 0;
+            return (
+              <g key={`yl-${y}`}>
+                <line
+                  x1="5"
+                  x2="95"
+                  y1={y}
+                  y2={y}
+                  stroke="var(--color-border)"
+                  strokeWidth={isLos ? 0.85 * S : isTen ? 0.4 * S : 0.22 * S}
+                  strokeDasharray={isLos || isTen ? undefined : "0.7 1.1"}
+                  opacity={isLos ? 0.98 : isTen ? 0.6 : 0.3}
+                />
+                {/* Yard number = distance from LOS */}
+                {isFive && !isLos && (
+                  <text
+                    x="6.2"
+                    y={y + 0.7}
+                    fill="var(--color-subtle)"
+                    fontSize={fontS(1.55)}
+                    fontFamily="var(--font-body)"
+                    fontWeight="600"
+                    opacity={0.65}
+                  >
+                    {fromLos > 0 ? `+${fromLos}` : `${fromLos}`}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+          {/* HS hash marks ~18.5 yd apart (HASH_L / HASH_R) */}
           {[20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80].map((y) => (
-            <line
-              key={`yl-${y}`}
-              x1="5"
-              x2="95"
-              y1={y}
-              y2={y}
-              stroke="var(--color-border)"
-              strokeWidth={y === LOS_Y ? 0.75 * S : y % 10 === 0 ? 0.35 * S : 0.22 * S}
-              strokeDasharray={y === LOS_Y ? undefined : y % 10 === 0 ? undefined : "0.8 1.2"}
-              opacity={y === LOS_Y ? 0.95 : y % 10 === 0 ? 0.55 : 0.28}
-            />
-          ))}
-          {[20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80].map((y) => (
-            <g key={`hash-${y}`} opacity={y === LOS_Y ? 0.85 : 0.5}>
-              <line x1="34" x2="36.5" y1={y} y2={y} stroke="var(--color-fg)" strokeWidth={0.4 * S} />
-              <line x1="63.5" x2="66" y1={y} y2={y} stroke="var(--color-fg)" strokeWidth={0.4 * S} />
+            <g key={`hash-${y}`} opacity={y === LOS_Y ? 0.9 : 0.48}>
+              <line
+                x1={HASH_L - 1.1}
+                x2={HASH_L + 1.1}
+                y1={y}
+                y2={y}
+                stroke="var(--color-fg)"
+                strokeWidth={0.38 * S}
+              />
+              <line
+                x1={HASH_R - 1.1}
+                x2={HASH_R + 1.1}
+                y1={y}
+                y2={y}
+                stroke="var(--color-fg)"
+                strokeWidth={0.38 * S}
+              />
             </g>
           ))}
           {[20, 30, 40, 50, 60, 70, 80].map((y) => (
@@ -839,15 +878,15 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
             y1={LB_Y}
             y2={LB_Y}
             stroke="var(--color-info)"
-            strokeWidth={0.25 * S}
+            strokeWidth={0.28 * S}
             strokeDasharray="1.2 1.4"
-            opacity={0.45}
+            opacity={0.5}
           />
-          <text x="8.5" y={LB_Y - 0.8} fill="var(--color-info)" fontSize={fontS(1.5)} fontFamily="var(--font-body)" opacity={0.7}>
-            LB 4yd
+          <text x="8.5" y={LB_Y - 0.85} fill="var(--color-info)" fontSize={fontS(1.45)} fontFamily="var(--font-body)" opacity={0.75}>
+            LB · 4 yd
           </text>
-          <text x="50" y="51.9" textAnchor="middle" fill="var(--color-subtle)" fontSize={fontS(2.4)} fontFamily="var(--font-body)" fontWeight="600" opacity={0.75}>
-            LOS
+          <text x="50" y={LOS_Y + 1.85} textAnchor="middle" fill="var(--color-subtle)" fontSize={fontS(2.2)} fontFamily="var(--font-body)" fontWeight="600" opacity={0.8}>
+            LOS · 0
           </text>
           {customMode && (
             <text x="50" y="8" textAnchor="middle" fill="var(--color-primary)" fontSize={fontS(2.1)} fontWeight="700" fontFamily="var(--font-display)">

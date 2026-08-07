@@ -125,12 +125,24 @@ export interface AssignmentReport {
   gaps: { id: string; label: string; x: number; covered: boolean }[];
 }
 
+/**
+ * Field scale: 1 unit ≈ 1 yard (depth + lateral in the LOS box).
+ * LOS at y=50; offense y>50; defense y<50.
+ */
 export const LOS_Y = 50;
-export const LB_DEPTH = 4; // yards off LOS
-export const DL_Y = 49;
+export const LB_DEPTH = 4; // yards off LOS (standard LB depth)
+export const DL_Y = 49; // ~1 yd off ball (3-point stance)
 export const LB_Y = LOS_Y - LB_DEPTH; // 46
+/** OL helmet line — ~1 yard behind LOS (not 2) */
+export const OL_DEPTH = 1;
 /** Lead blockers (pullers / FB) finish at least this deep — matches typical HB finish */
 export const LEAD_FINISH_Y = 30;
+/**
+ * HS hash marks (~18.5 yd apart). Center = 50.
+ * (NFL ~6 yd; college ~13 yd — we use HS for youth teaching.)
+ */
+export const HASH_L = 41;
+export const HASH_R = 59;
 
 export type SchemeIdOrNull = SchemeId | null;
 
@@ -219,94 +231,105 @@ function movePath(def: LookDefender, x: number, y: number): LookDefender {
   };
 }
 
-/** Build raw front alignments (LBs at 4 yards). */
+/**
+ * Build raw front alignments.
+ * Depths: DL ~1 yd, LB 4 yd. Laterals keyed to OL landmarks (3.5 yd splits).
+ */
 export function buildFrontAlignments(frontId: DefFrontId): LookDefender[] {
-  const fs = d("look-fs", "FS", "Free safety", [50, 34], "Deep middle");
-  const ss = d("look-ss", "SS", "Strong safety", [64, 38], "Box / alley");
-  const cbL = d("look-cb-l", "CB", "LCB", [16, 48], "Boundary corner");
-  const cbR = d("look-cb-r", "CB", "RCB", [84, 48], "Field corner");
+  // Landmarks from OL_X (keep in sync)
+  const LT = 43;
+  const LG = 46.5;
+  const C = 50;
+  const RG = 53.5;
+  const RT = 57;
+  const Y = 61;
+  const fs = d("look-fs", "FS", "Free safety", [50, 34], "Deep middle · 16 yd");
+  const ss = d("look-ss", "SS", "Strong safety", [60, 38], "Box / alley · 12 yd");
+  const cbL = d("look-cb-l", "CB", "LCB", [18, 48], "Boundary corner · 2 yd");
+  const cbR = d("look-cb-r", "CB", "RCB", [82, 48], "Field corner · 2 yd");
   const lb = LB_Y;
 
   if (frontId === "custom" || frontId === "43-over") {
+    // Over: shade weak A + 3-tech strong B
     return [
-      d("look-de-l", "E", "LE", [34, DL_Y], "Weak end"),
-      d("look-dt-l", "N", "1-tech / shade", [46, DL_Y], "A-gap shade"),
-      d("look-dt-r", "T", "3-tech", [56, DL_Y], "Strong 3-tech"),
-      d("look-de-r", "E", "RE", [66, DL_Y], "Strong end"),
-      d("look-will", "W", "Will", [38, lb], "Weak LB · 4 yd"),
-      d("look-mike", "M", "Mike", [50, lb], "Mike · 4 yd"),
-      d("look-sam", "S", "Sam", [62, lb], "Sam · 4 yd"),
+      d("look-de-l", "E", "LE", [LT - 2.5, DL_Y], "Weak 5-tech · outside LT"),
+      d("look-dt-l", "N", "1-tech / shade", [C - 1.5, DL_Y], "Weak A shade"),
+      d("look-dt-r", "T", "3-tech", [RG + 1.2, DL_Y], "Strong 3-tech · outside RG"),
+      d("look-de-r", "E", "RE", [RT + 2.5, DL_Y], "Strong 5-tech · outside RT"),
+      d("look-will", "W", "Will", [LG - 1, lb], "Weak LB · 4 yd"),
+      d("look-mike", "M", "Mike", [C, lb], "Mike · 4 yd"),
+      d("look-sam", "S", "Sam", [RT, lb], "Sam · 4 yd"),
       fs, ss, cbL, cbR,
     ];
   }
 
   if (frontId === "43-under") {
     return [
-      d("look-de-l", "E", "LE", [34, DL_Y], "Weak end"),
-      d("look-dt-l", "T", "3-tech (weak)", [42, DL_Y], "Weak 3-tech"),
-      d("look-dt-r", "N", "1-tech / shade", [54, DL_Y], "Strong shade"),
-      d("look-de-r", "E", "RE", [66, DL_Y], "Strong end"),
-      d("look-will", "W", "Will", [36, lb], "Will · 4 yd"),
-      d("look-mike", "M", "Mike", [50, lb], "Mike · 4 yd"),
-      d("look-sam", "S", "Sam", [64, lb], "Sam · 4 yd"),
+      d("look-de-l", "E", "LE", [LT - 2.5, DL_Y], "Weak end"),
+      d("look-dt-l", "T", "3-tech (weak)", [LG - 1.2, DL_Y], "Weak 3-tech"),
+      d("look-dt-r", "N", "1-tech / shade", [C + 1.5, DL_Y], "Strong shade"),
+      d("look-de-r", "E", "RE", [RT + 2.5, DL_Y], "Strong end"),
+      d("look-will", "W", "Will", [LT, lb], "Will · 4 yd"),
+      d("look-mike", "M", "Mike", [C, lb], "Mike · 4 yd"),
+      d("look-sam", "S", "Sam", [RT + 1, lb], "Sam · 4 yd"),
       fs, ss, cbL, cbR,
     ];
   }
 
   if (frontId === "52") {
     return [
-      d("look-de-l", "E", "LE", [30, DL_Y], "Wide end"),
-      d("look-dt-l", "T", "DT", [42, DL_Y], "Down tackle"),
-      d("look-dt-r", "N", "Nose", [50, DL_Y], "0-tech nose"),
-      d("look-de-r", "T", "DT", [58, DL_Y], "Down tackle"),
-      d("look-edge-r", "E", "RE", [70, DL_Y], "Wide end"),
-      d("look-will", "W", "ILB", [42, lb], "ILB weak · 4 yd"),
-      d("look-mike", "M", "ILB", [58, lb], "ILB strong · 4 yd"),
-      d("look-sam", "S", "OLB", [74, lb], "Force OLB · 4 yd"),
+      d("look-de-l", "E", "LE", [LT - 4, DL_Y], "Wide end"),
+      d("look-dt-l", "T", "DT", [LG - 1, DL_Y], "Down tackle"),
+      d("look-dt-r", "N", "Nose", [C, DL_Y], "0-tech nose"),
+      d("look-de-r", "T", "DT", [RG + 1, DL_Y], "Down tackle"),
+      d("look-edge-r", "E", "RE", [Y + 2, DL_Y], "Wide end"),
+      d("look-will", "W", "ILB", [LG, lb], "ILB weak · 4 yd"),
+      d("look-mike", "M", "ILB", [RG, lb], "ILB strong · 4 yd"),
+      d("look-sam", "S", "OLB", [Y + 4, lb], "Force OLB · 4 yd"),
       fs, ss, cbL, cbR,
     ];
   }
 
   if (frontId === "34") {
     return [
-      d("look-de-l", "E", "LE", [38, DL_Y], "5-tech end"),
-      d("look-dt-l", "N", "Nose", [50, DL_Y], "0-tech nose"),
-      d("look-de-r", "E", "RE", [62, DL_Y], "5-tech end"),
-      d("look-will", "W", "Will", [34, lb], "OLB weak · 4 yd"),
-      d("look-mike", "M", "Mike", [46, lb], "ILB · 4 yd"),
-      d("look-mike-r", "M", "Mo", [54, lb], "ILB · 4 yd"),
-      d("look-sam", "S", "Sam", [66, lb], "OLB strong · 4 yd"),
+      d("look-de-l", "E", "LE", [LT, DL_Y], "5-tech end"),
+      d("look-dt-l", "N", "Nose", [C, DL_Y], "0-tech nose"),
+      d("look-de-r", "E", "RE", [RT, DL_Y], "5-tech end"),
+      d("look-will", "W", "Will", [LT - 3, lb], "OLB weak · 4 yd"),
+      d("look-mike", "M", "Mike", [C - 2.5, lb], "ILB · 4 yd"),
+      d("look-mike-r", "M", "Mo", [C + 2.5, lb], "ILB · 4 yd"),
+      d("look-sam", "S", "Sam", [RT + 3, lb], "OLB strong · 4 yd"),
       fs, ss, cbL, cbR,
     ];
   }
 
   if (frontId === "bear") {
     return [
-      d("look-de-l", "E", "LE", [36, DL_Y], "Tight end"),
-      d("look-dt-l", "T", "DT", [44, DL_Y], "3-tech"),
-      d("look-dt-r", "N", "Nose", [50, DL_Y], "0-tech"),
-      d("look-de-r", "T", "DT", [56, DL_Y], "3-tech"),
-      d("look-edge-r", "E", "RE", [64, DL_Y], "Tight end"),
-      d("look-will", "W", "LB", [40, lb], "LB · 4 yd"),
-      d("look-mike", "M", "LB", [50, lb], "LB · 4 yd"),
-      d("look-sam", "S", "LB", [60, lb], "LB · 4 yd"),
+      d("look-de-l", "E", "LE", [LT - 2, DL_Y], "Tight end"),
+      d("look-dt-l", "T", "DT", [LG - 0.5, DL_Y], "3-tech"),
+      d("look-dt-r", "N", "Nose", [C, DL_Y], "0-tech"),
+      d("look-de-r", "T", "DT", [RG + 0.5, DL_Y], "3-tech"),
+      d("look-edge-r", "E", "RE", [RT + 2, DL_Y], "Tight end"),
+      d("look-will", "W", "LB", [LT + 1, lb], "LB · 4 yd"),
+      d("look-mike", "M", "LB", [C, lb], "LB · 4 yd"),
+      d("look-sam", "S", "LB", [RT - 1, lb], "LB · 4 yd"),
       fs,
-      d("look-ss", "SS", "SS", [60, 36], "Alley"),
+      d("look-ss", "SS", "SS", [RG + 4, 36], "Alley · 14 yd"),
       cbL, cbR,
     ];
   }
 
-  // 3-3 stack — stack LBs still ~4 yd off
+  // 3-3 stack — LBs stacked 4 yd off over the front
   return [
-    d("look-de-l", "E", "LE", [36, DL_Y], "End"),
-    d("look-dt-l", "N", "Nose", [50, DL_Y], "Nose"),
-    d("look-de-r", "E", "RE", [64, DL_Y], "End"),
-    d("look-will", "W", "Stack W", [36, lb], "Stacked · 4 yd"),
-    d("look-mike", "M", "Stack M", [50, lb], "Stacked · 4 yd"),
-    d("look-sam", "S", "Stack S", [64, lb], "Stacked · 4 yd"),
-    d("look-ss", "SS", "Apex", [70, 40], "Apex / force"),
+    d("look-de-l", "E", "LE", [LT - 1.5, DL_Y], "End"),
+    d("look-dt-l", "N", "Nose", [C, DL_Y], "Nose"),
+    d("look-de-r", "E", "RE", [RT + 1.5, DL_Y], "End"),
+    d("look-will", "W", "Stack W", [LT - 1.5, lb], "Stacked · 4 yd"),
+    d("look-mike", "M", "Stack M", [C, lb], "Stacked · 4 yd"),
+    d("look-sam", "S", "Stack S", [RT + 1.5, lb], "Stacked · 4 yd"),
+    d("look-ss", "SS", "Apex", [Y + 2, 40], "Apex / force · 10 yd"),
     fs, cbL, cbR,
-    d("look-nick-r", "NB", "Nickel", [72, 48], "Slot nickel — not DL"),
+    d("look-nick-r", "NB", "Nickel", [Y + 4, 48], "Slot nickel — not DL"),
   ];
 }
 
@@ -322,20 +345,25 @@ export function applyPositionOverrides(
   });
 }
 
+/**
+ * OL center-to-center ≈ 3.5 yd (readable + realistic).
+ * Old board used 6 yd splits — too wide for yardage teaching.
+ *   LT 43 · LG 46.5 · C 50 · RG 53.5 · RT 57 · Y 61
+ */
 export const OL_X: Record<string, number> = {
-  lt: 38,
-  lg: 44,
+  lt: 43,
+  lg: 46.5,
   c: 50,
-  rg: 56,
-  rt: 62,
-  y: 68,
-  te: 68,
+  rg: 53.5,
+  rt: 57,
+  y: 61,
+  te: 61,
   fb: 50,
-  h: 46,
+  h: 47,
   rb: 50,
   qb: 50,
-  x: 16,
-  z: 84,
+  x: 18,
+  z: 82,
 };
 
 const OL_ORDER = ["lt", "lg", "c", "rg", "rt"] as const;
@@ -442,8 +470,8 @@ function dist2d(ax: number, ay: number, bx: number, by: number): number {
   return Math.hypot(dx, dy);
 }
 
-/** OL landmark y (helmet line) */
-const OL_Y = 52;
+/** OL landmark y (helmet line) — 1 yd behind LOS */
+const OL_Y = LOS_Y + OL_DEPTH; // 51
 
 
 function gapLabelForOl(ol: string, playside: "L" | "R"): string {
@@ -837,7 +865,7 @@ export function evaluateAssignments(
   // Helper paths
   /**
    * Smooth monotonic OL paths — no backtracking / zigzag.
-   * Field: OL start ~y=52, defense smaller y (drive = decreasing y).
+   * Field: OL start ~y=51 (1 yd behind LOS), defense smaller y (drive = decreasing y).
    */
   function lerpPt(a: FieldPoint, b: FieldPoint, t: number): FieldPoint {
     return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
@@ -1097,7 +1125,7 @@ export function evaluateAssignments(
           ra.why = `Iso install combo on ${nose.tag}. GOD: double the down man, one climbs to LB on flow.`;
           ra.job = `Combo ${nose.tag} → climb`;
           ra.path = pathCombo(
-            [OL_X[ol]!, 52],
+            [OL_X[ol]!, OL_Y],
             [alignX(nose), alignY(nose)],
             nearestLb(lbs, 50),
           );
@@ -1110,7 +1138,7 @@ export function evaluateAssignments(
     const playsideEdge = ps === "R" ? dls[dls.length - 1] : dls[0];
     const playsideInterior =
       dls.find((d) =>
-        ps === "R" ? alignX(d) >= 52 && alignX(d) < 64 : alignX(d) <= 48 && alignX(d) > 36,
+        ps === "R" ? alignX(d) >= 51 && alignX(d) < 58 : alignX(d) <= 49 && alignX(d) > 42,
       ) ?? playsideEdge;
     const backsideEdge = ps === "R" ? dls[0] : dls[dls.length - 1];
     const kickLb = nearestLbDef(lbs, ps === "R" ? 62 : 38);
@@ -1145,7 +1173,7 @@ export function evaluateAssignments(
       ra.targetIds = [backsideEdge.id];
       ra.targetTags = [backsideEdge.tag];
       ra.job = `Hinge ${backsideEdge.tag}`;
-      ra.path = pathHinge([OL_X.lt!, 52], [alignX(backsideEdge), alignY(backsideEdge)]);
+      ra.path = pathHinge([OL_X.lt!, OL_Y], [alignX(backsideEdge), alignY(backsideEdge)]);
     }
     // Puller LG
     if (kickLb) {
@@ -1163,7 +1191,7 @@ export function evaluateAssignments(
       ra.targetIds = [kickLb.id];
       ra.targetTags = [kickLb.tag];
       ra.job = `Pull kick ${kickLb.tag}`;
-      ra.path = pathPull([OL_X.lg!, 52], [alignX(kickLb), alignY(kickLb)], ps);
+      ra.path = pathPull([OL_X.lg!, OL_Y], [alignX(kickLb), alignY(kickLb)], ps);
       const fb = ensureRole("fb");
       fb.rule = "lead";
       fb.usesGod = false;
@@ -1187,7 +1215,7 @@ export function evaluateAssignments(
         cra.job = `Block back ${vacated.tag}`;
         cra.targetIds = [vacated.id];
         cra.targetTags = [vacated.tag];
-        cra.path = pathBase([50, 52], [alignX(vacated), alignY(vacated)]);
+        cra.path = pathBase([50, OL_Y], [alignX(vacated), alignY(vacated)]);
       }
     }
   } else if (scheme === "counter-simple" || scheme === "counter") {
@@ -1579,7 +1607,7 @@ export function evaluateAssignments(
         ra.targetTags = [dl.tag];
         ra.why = `Reach ${dl.tag}: step playside, gain width, seal inside so speed stays outside.`;
         ra.job = `Reach ${dl.tag}`;
-        ra.path = pathReach([OL_X[ol]!, 52], [alignX(dl), alignY(dl)], dir);
+        ra.path = pathReach([OL_X[ol]!, OL_Y], [alignX(dl), alignY(dl)], dir);
       }
     }
     const emol = ps === "R" ? dls[dls.length - 1] : dls[0];
@@ -1594,7 +1622,7 @@ export function evaluateAssignments(
         ra.targetIds = [emol.id];
         ra.targetTags = [emol.tag];
         ra.job = `Seal ${emol.tag}`;
-        ra.path = pathReach([OL_X[ol] ?? 62, 52], [alignX(emol), alignY(emol)], dir);
+        ra.path = pathReach([OL_X[ol] ?? OL_X.rt!, OL_Y], [alignX(emol), alignY(emol)], dir);
       }
     }
   } else if (scheme === "inside-zone" || scheme === "outside-zone") {
@@ -1625,9 +1653,9 @@ export function evaluateAssignments(
           ra.job = `Zone combo ${dl.tag}`;
           ra.path =
             scheme === "outside-zone"
-              ? pathReach([OL_X[ol]!, 52], [alignX(dl), alignY(dl)], dir)
+              ? pathReach([OL_X[ol]!, OL_Y], [alignX(dl), alignY(dl)], dir)
               : pathCombo(
-                  [OL_X[ol]!, 52],
+                  [OL_X[ol]!, OL_Y],
                   [alignX(dl), alignY(dl)],
                   nearestLb(lbs, OL_X[ol]!),
                 );
@@ -1639,8 +1667,8 @@ export function evaluateAssignments(
           ra.job = `Zone ${dl.tag}`;
           ra.path =
             scheme === "outside-zone"
-              ? pathReach([OL_X[ol]!, 52], [alignX(dl), alignY(dl)], dir)
-              : pathBase([OL_X[ol]!, 52], [alignX(dl), alignY(dl)]);
+              ? pathReach([OL_X[ol]!, OL_Y], [alignX(dl), alignY(dl)], dir)
+              : pathBase([OL_X[ol]!, OL_Y], [alignX(dl), alignY(dl)]);
         }
       } else {
         const down = findDownDefender(ol, dls, ps);
@@ -1650,7 +1678,7 @@ export function evaluateAssignments(
           ra.why = `Uncovered zone — work to ${down.tag} combo then climb.`;
           ra.job = `Zone help ${down.tag}`;
           ra.path = pathCombo(
-            [OL_X[ol]!, 52],
+            [OL_X[ol]!, OL_Y],
             [alignX(down), alignY(down)],
             nearestLb(lbs, OL_X[ol]!),
           );
@@ -1675,7 +1703,7 @@ export function evaluateAssignments(
       ra.targetIds = [def.id];
       ra.targetTags = [def.tag];
       ra.job = "Stalk CB";
-      ra.path = pathBase([OL_X.x!, 52], [alignX(def), alignY(def)]);
+      ra.path = pathBase([OL_X.x!, LOS_Y + 1], [alignX(def), alignY(def)]);
     } else if (t === "CB" || t === "NB") {
       // Field CB or nickel — WR/TE stalk, NEVER RT base
       const skill = alignX(def) > 70 ? "z" : "y";
@@ -1688,7 +1716,7 @@ export function evaluateAssignments(
       ra.targetIds = [def.id];
       ra.targetTags = [def.tag];
       ra.job = `Stalk ${def.tag}`;
-      ra.path = pathBase([OL_X[skill] ?? 84, 52], [alignX(def), alignY(def)]);
+      ra.path = pathBase([OL_X[skill] ?? OL_X.z!, LOS_Y + 1], [alignX(def), alignY(def)]);
     } else if (t === "SS" || t === "FS") {
       // leave mostly free unless empty
       if (def.engagedBy.length === 0) {
@@ -1713,8 +1741,8 @@ export function evaluateAssignments(
     if (!ra.path.length) {
       const dl = olToDl.get(ol);
       ra.path = dl
-        ? pathBase([OL_X[ol]!, 52], [alignX(dl), alignY(dl)])
-        : pathClimb([OL_X[ol]!, 52], nearestLb(lbs, OL_X[ol]!));
+        ? pathBase([OL_X[ol]!, OL_Y], [alignX(dl), alignY(dl)])
+        : pathClimb([OL_X[ol]!, OL_Y], nearestLb(lbs, OL_X[ol]!));
     }
     if (!ra.why) {
       ra.why = godScheme
@@ -1740,7 +1768,7 @@ export function evaluateAssignments(
       ra.targetIds = [emol.id];
       ra.targetTags = [emol.tag];
       ra.job = `Help ${emol.tag}`;
-      ra.path = pathBase([OL_X.y!, 52], [alignX(emol), alignY(emol)]);
+      ra.path = pathBase([OL_X.y!, OL_Y], [alignX(emol), alignY(emol)]);
       if (!emol.engagedBy.includes("y")) {
         emol.engagedBy = [...emol.engagedBy, "y"];
       }
