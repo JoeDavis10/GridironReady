@@ -493,6 +493,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
         pos,
         pressure: sample?.pressure ?? 0,
         double: sample?.double ?? Boolean(def.doubleTeam),
+        grabbed: sample?.grabbed ?? false,
       };
     });
   }, [physics, look]);
@@ -949,15 +950,15 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
               );
             })}
 
-          {/* Contact lines */}
+          {/* Grab links — solid when attached (not bounce/hitbox noise) */}
           {contacts.map((c) => {
             const active =
               focusLookId == null ||
               focusLookId === c.def.id ||
               (focusRoleId != null && c.key.startsWith(focusRoleId));
-            const sw = pathW(0.4 + c.force * 0.5);
+            const sw = pathW(0.55 + c.force * 0.55);
             return (
-              <g key={c.key} opacity={active ? 0.85 : 0.14}>
+              <g key={c.key} opacity={active ? 0.95 : 0.16}>
                 <line
                   x1={c.x1}
                   y1={c.y1}
@@ -965,11 +966,42 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                   y2={c.y2}
                   stroke={c.double ? DOUBLE : CONTACT}
                   strokeWidth={sw}
-                  strokeDasharray={c.double ? "1.1 0.6" : "0.7 0.7"}
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+                {/* Grab latch mark mid-link */}
+                <circle
+                  cx={c.mid[0]}
+                  cy={c.mid[1]}
+                  r={0.55 * S}
+                  fill={c.double ? DOUBLE : CONTACT}
+                  opacity={0.85}
                 />
               </g>
             );
           })}
+
+          {/* Live ball — defense tracks this */}
+          {hasLook && showLook && physics?.ball && (
+            <g>
+              <circle
+                cx={physics.ball[0]}
+                cy={physics.ball[1]}
+                r={1.15 * S}
+                fill="#c45c12"
+                stroke="#f5d0a9"
+                strokeWidth={0.35 * S}
+                filter="url(#softGlow)"
+              />
+              <circle
+                cx={physics.ball[0]}
+                cy={physics.ball[1]}
+                r={0.35 * S}
+                fill="#2a1a0a"
+                opacity={0.45}
+              />
+            </g>
+          )}
 
           {doubleTargets.map(({ def, pos, pressure }) => (
             <circle
@@ -986,7 +1018,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
           ))}
 
           {/* Defense under offense for readability */}
-          {lookStates.map(({ def, pos, pressure }) => {
+          {lookStates.map(({ def, pos, pressure, grabbed }) => {
             const focusedNow = focusLookId === def.id;
             const dimmed =
               (focusLookId != null && !focusedNow) ||
@@ -994,7 +1026,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                 !def.engagedBy.includes(focusRoleId) &&
                 focusLookId == null);
             const s = ((focusedNow ? 2.45 : 2.1) + pressure * 0.22) * S;
-            // True physics hitbox (field units) — independent of zoom / bubble size
+            // Visual reference only — grab attachment drives motion
             const hb = hitboxDefense(classifyDefender(def));
             return (
               <g
@@ -1009,15 +1041,25 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                   setFocusLookId((cur) => (cur === def.id ? null : def.id));
                 }}
               >
-                {/* Fixed collision radius — does not scale with Size/Zoom UI */}
+                {/* Reference radius only — motion is grab-driven */}
                 <circle
                   r={hb}
                   fill="none"
                   stroke={DEF_STROKE}
                   strokeWidth={0.12}
-                  opacity={0.28}
+                  opacity={0.18}
                   vectorEffect="non-scaling-stroke"
                 />
+                {grabbed && (
+                  <circle
+                    r={hb + 0.55}
+                    fill="none"
+                    stroke={CONTACT}
+                    strokeWidth={0.28 * S}
+                    opacity={0.75}
+                    strokeDasharray="0.9 0.5"
+                  />
+                )}
                 {customMode && (
                   <circle r={s + 1.2} fill="none" stroke="var(--color-primary)" strokeWidth={0.3 * S} strokeDasharray="0.6 0.5" opacity={dragId === def.id ? 0.9 : 0.35} />
                 )}
@@ -1155,7 +1197,15 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="inline-block size-2.5 shrink-0 rounded-full border border-[var(--color-muted)]" />
-              Hitbox (fixed)
+              Hitbox (ref)
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="size-2.5 shrink-0 rounded-full bg-[#c45c12]" />
+              Ball
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-0.5 w-3 shrink-0 rounded-full bg-[var(--color-warn)]" />
+              Grab
             </span>
           </div>
         )}
