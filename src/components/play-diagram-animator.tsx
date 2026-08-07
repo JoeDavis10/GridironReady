@@ -30,7 +30,10 @@ import {
   getAssignmentReport,
   type DefFrontId,
 } from "@/data/play-looks";
-import { sampleBlockPhysics } from "@/lib/block-physics";
+import {
+  globalPlayProgress,
+  sampleBlockPhysics,
+} from "@/lib/block-physics";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -267,6 +270,8 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
   const [showImmersiveOpts, setShowImmersiveOpts] = useState(false);
   /** Player bubble size multiplier (0.6–2). Affects OL + D markers for clarity. */
   const [bubbleScale, setBubbleScale] = useState(1);
+  /** Diagram zoom 1–2.5 (viewBox) */
+  const [zoom, setZoom] = useState(1);
   const [customPos, setCustomPos] = useState<Record<string, FieldPoint>>({});
   const [dragId, setDragId] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -452,11 +457,11 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
   }, [playing, reducedMotion, simPlay.phases]);
 
   const roleStates = useMemo(() => {
-    const t = easeInOut(progress);
+    // Full-play timeline: every role rides 0→1 over the same total duration
+    const g = globalPlayProgress(simPlay, phaseIndex, progress);
+    const t = easeInOut(g);
     return simPlay.roles.map((role, i) => {
-      const start = roleProgressAtPhaseStart(simPlay, phaseIndex, role.id);
-      const end = roleProgressAtPhaseEnd(simPlay, phaseIndex, role.id);
-      const along = start + (end - start) * t;
+      const along = t;
       const pos = pointAlongPath(role.path, along);
       const pull = isPuller(role);
       return { role, i, along, pos, trail: role.path, pull };
@@ -735,7 +740,13 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
         >
         <svg
           ref={svgRef}
-          viewBox="0 0 100 100"
+          viewBox={(() => {
+            const size = 100 / zoom;
+            const origin = (100 - size) / 2;
+            // Bias slightly toward LOS / box for coaching readability
+            const oy = origin + (zoom > 1 ? -2 * (zoom - 1) : 0);
+            return `${origin} ${oy} ${size} ${size}`;
+          })()}
           width="100%"
           height="100%"
           preserveAspectRatio="xMidYMid meet"
@@ -831,6 +842,38 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
               CUSTOM — drag D to re-assign
             </text>
           )}
+          {/* Drive paths — desired displacement angle for engaged defenders */}
+          {hasLook &&
+            showLook &&
+            look.map((def) => {
+              const dp = def.drivePath;
+              if (!dp || dp.length < 2) return null;
+              const d = dp
+                .map((pt, i) => `${i === 0 ? "M" : "L"}${pt[0].toFixed(2)},${pt[1].toFixed(2)}`)
+                .join(" ");
+              const end = dp[dp.length - 1]!;
+              const eng = def.engagedBy.length > 0;
+              return (
+                <g key={`drive-${def.id}`} opacity={eng ? 0.85 : 0.28}>
+                  <path
+                    d={d}
+                    fill="none"
+                    stroke={eng ? "var(--color-warning, #e6a23c)" : "var(--color-subtle)"}
+                    strokeWidth={pathW(eng ? 0.55 : 0.3)}
+                    strokeDasharray={eng ? "1.4 0.7" : "0.8 1"}
+                    strokeLinecap="round"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  {eng && (
+                    <polygon
+                      points={`${end[0]},${end[1] - 0.9} ${end[0] + 0.7},${end[1] + 0.5} ${end[0] - 0.7},${end[1] + 0.5}`}
+                      fill="var(--color-warning, #e6a23c)"
+                      opacity={0.9}
+                    />
+                  )}
+                </g>
+              );
+            })}
 
           {/* Paths — pullers solid+arrow, others light dashed */}
           {roleStates.map(({ role, i, trail, pull }) => {
@@ -1075,6 +1118,10 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
               />
               Defense
             </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-0.5 w-3 shrink-0 rounded-full bg-[var(--color-warning,#e6a23c)]" />
+              Drive path
+            </span>
           </div>
         )}
 
@@ -1259,6 +1306,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
             "mt-auto shrink-0 border-t border-[var(--color-border)] bg-[color-mix(in_oklab,var(--color-bg)_97%,transparent)] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md",
         )}
       >
+        <div className={cn("flex w-full min-w-0 flex-col gap-1.5", immersive && "gap-1")}>
         <label
           className={cn(
             "flex w-full min-w-0 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5",
@@ -1312,6 +1360,51 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
             Reset
           </button>
         </label>
+        <label
+          className={cn(
+            "flex w-full min-w-0 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5",
+            immersive && "py-1",
+          )}
+        >
+          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--color-subtle)]">
+            Zoom
+          </span>
+          <input
+            type="range"
+            min={1}
+            max={2.5}
+            step={0.05}
+            value={zoom}
+            onChange={(e) => setZoom(Number(e.target.value))}
+            aria-label="Diagram zoom"
+            className={cn(
+              "min-w-0 flex-1 cursor-pointer appearance-none bg-transparent",
+              "[&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-runnable-track]:rounded-full",
+              "[&::-webkit-slider-runnable-track]:bg-[var(--color-border-strong)]",
+              "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:mt-[-5px]",
+              "[&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full",
+              "[&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[var(--color-bg)]",
+              "[&::-webkit-slider-thumb]:bg-[var(--color-info)]",
+              "[&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full",
+              "[&::-moz-range-track]:bg-[var(--color-border-strong)]",
+              "[&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full",
+              "[&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-[var(--color-info)]",
+            )}
+          />
+          <span className="w-10 shrink-0 text-right text-[11px] font-semibold tabular-nums text-[var(--color-muted)]">
+            {zoom.toFixed(2)}×
+          </span>
+          <button
+            type="button"
+            onClick={() => setZoom(1)}
+            className="h-7 shrink-0 rounded-full border border-[var(--color-border)] px-2 text-[10px] font-semibold text-[var(--color-muted)] touch-manipulation disabled:opacity-40"
+            disabled={Math.abs(zoom - 1) < 0.01}
+            aria-label="Reset zoom"
+          >
+            Reset
+          </button>
+        </label>
+        </div>
         <div
           className={cn(
             "flex w-full min-w-0 flex-wrap items-center gap-2",

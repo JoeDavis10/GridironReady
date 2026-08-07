@@ -15,6 +15,11 @@ export interface LookDefender {
   engagedBy: string[];
   doubleTeam?: boolean;
   job: string;
+  /**
+   * Desired drive line once engaged — blocker aims to displace the defender
+   * along this path (angle of drive). Used by block physics + diagram overlay.
+   */
+  drivePath?: FieldPoint[];
 }
 
 export interface PlayLook {
@@ -340,6 +345,7 @@ function cloneDefs(defs: LookDefender[]): LookDefender[] {
     ...x,
     path: x.path.map((p) => [p[0], p[1]] as FieldPoint),
     engagedBy: [...x.engagedBy],
+    drivePath: x.drivePath?.map((p) => [p[0], p[1]] as FieldPoint),
   }));
 }
 
@@ -1340,6 +1346,10 @@ export function evaluateAssignments(
     }
   }
 
+
+  // Attach drive paths: desired angle of displacement for each engaged defender
+  attachDrivePaths(defs, scheme, ps, roleMap);
+
   return {
     scheme,
     schemeUsesGod: godScheme,
@@ -1350,6 +1360,113 @@ export function evaluateAssignments(
     gaps,
   };
 }
+
+/**
+ * Build a drive path for each defender from engagement geometry + scheme.
+ * Path[0] = alignment, then contact lean, then finish (driven yards).
+ */
+function attachDrivePaths(
+  defs: LookDefender[],
+  scheme: SchemeId,
+  ps: "L" | "R",
+  roleMap: Map<string, RoleAssignment>,
+): void {
+  const side = ps === "R" ? 1 : -1;
+  for (const def of defs) {
+    const x0 = def.path[0]?.[0] ?? 50;
+    const y0 = def.path[0]?.[1] ?? 48;
+    const level = classifyDefender(def);
+
+    if (!def.engagedBy.length) {
+      // Idle: small reactive settle so everyone still "moves" full duration
+      def.drivePath = [
+        [x0, y0],
+        [x0 + side * 0.4, y0 - 0.8],
+        [x0 + side * 0.6, y0 - 1.6],
+      ];
+      continue;
+    }
+
+    // Weighted engagers' landmarks
+    let ox = 0;
+    let n = 0;
+    for (const id of def.engagedBy) {
+      if (OL_X[id] != null) {
+        ox += OL_X[id]!;
+        n++;
+      }
+    }
+    ox = n > 0 ? ox / n : x0;
+
+    // Base drive: away from OL through defender (downfield for D = -y)
+    let dx = (x0 - ox) * 0.35;
+    let dy = -1;
+
+    if (scheme === "reach" || scheme === "outside-zone") {
+      dx = side * 1.4 + (x0 - ox) * 0.2;
+      dy = -0.55;
+    } else if (scheme === "power" || scheme === "counter" || scheme === "counter-simple") {
+      // Wall: slightly playside + downfield; kick LB more lateral
+      if (level === "lb") {
+        dx = side * 1.1;
+        dy = -0.35;
+      } else {
+        dx = side * 0.35 + (x0 - ox) * 0.15;
+        dy = -1.05;
+      }
+    } else if (scheme === "inside-zone") {
+      dx = side * 0.55 + (x0 - ox) * 0.25;
+      dy = -0.9;
+    } else if (scheme === "iso" || scheme === "dive") {
+      dx = (x0 - ox) * 0.2 + side * 0.15;
+      dy = level === "lb" ? -0.45 : -1.1;
+    }
+
+    // Normalize and scale yards of drive
+    const mag = Math.hypot(dx, dy) || 1;
+    dx /= mag;
+    dy /= mag;
+    const yards = level === "dl" ? (def.doubleTeam ? 7.5 : 5.5) : level === "lb" ? 4.5 : 3.2;
+
+    const midX = x0 + dx * yards * 0.4;
+    const midY = y0 + dy * yards * 0.4;
+    const endX = x0 + dx * yards;
+    const endY = y0 + dy * yards;
+
+    def.drivePath = [
+      [x0, y0],
+      [midX, midY],
+      [Math.min(94, Math.max(6, endX)), Math.min(94, Math.max(6, endY))],
+    ];
+
+    // Light path for lookProgress animation stays aligned with drive
+    def.path = [
+      [x0, y0],
+      [midX, midY],
+      [Math.min(94, Math.max(6, endX)), Math.min(94, Math.max(6, endY))],
+    ];
+
+    // Annotate jobs
+    const ang = (Math.atan2(-dy, dx) * 180) / Math.PI;
+    def.job = `${def.job} · drive ${ang.toFixed(0)}° ${yards.toFixed(0)}yd`;
+  }
+
+  // Nudge OL assignment paths to finish along same drive timeline length
+  for (const ra of roleMap.values()) {
+    if (ra.path.length < 2 || !ra.targetIds.length) continue;
+    const target = defs.find((d) => d.id === ra.targetIds[0]);
+    if (!target?.drivePath?.length) continue;
+    const fin = target.drivePath[target.drivePath.length - 1]!;
+    const last = ra.path[ra.path.length - 1]!;
+    // Extend OL finish slightly toward drive finish so motion lasts
+    ra.path = [
+      ...ra.path,
+      [(last[0] + fin[0]) / 2, (last[1] + fin[1]) / 2],
+      [fin[0] + (last[0] - fin[0]) * 0.15, fin[1] + 0.8],
+    ];
+  }
+}
+
 
 /** @deprecated use evaluateAssignments — kept for call sites */
 export function assignBlocking(
