@@ -7,11 +7,11 @@
  * - Blocker movement drives the defender (offset follows drive angle)
  * - Hitboxes are secondary (light D↔D separation + visual only)
  *
- * Free defenders:
- * - Track the live ball (QB → RB handoff) by position role
- * - DL: get-off then pursue with gap discipline
- * - LB: scrape/fit to ball
- * - DB: depth + angle to ball
+ * Free defenders (paced):
+ * - Play-read window before pursuit ramps
+ * - Max distance per step + cumulative travel budget
+ * - Assigned D hold gap until grab (do not all crash the ball)
+ * - After read: slow fit lines toward the football by level
  */
 import {
   pointAlongPath,
@@ -136,17 +136,54 @@ function massFor(level: DefLevel): number {
   return 0.95;
 }
 
+/**
+ * Free D pace — yards per physics step (~20ms).
+ * These are hard caps so free defenders cannot teleport to the ball.
+ */
+function maxStepFree(level: DefLevel): number {
+  if (level === "dl") return 0.11;
+  if (level === "lb") return 0.14;
+  return 0.12;
+}
+
+/** Max distance from alignment while free (gap integrity / contain). */
+function maxFromHomeFree(level: DefLevel): number {
+  if (level === "dl") return 4.5;
+  if (level === "lb") return 7.5;
+  return 6.5;
+}
+
+/** Cumulative path budget while free (prevents marathon sprints). */
+function maxTravelFree(level: DefLevel): number {
+  if (level === "dl") return 6;
+  if (level === "lb") return 9;
+  return 8;
+}
+
+/** Play-read window in ms before pursuit ramps (keys, not chase). */
+function readMs(level: DefLevel): number {
+  if (level === "dl") return 280; // get-off / first step
+  if (level === "lb") return 480; // LB read mesh / flow
+  return 620; // DB patience
+}
+
+/** Full-pursuit unlock after this many ms into the play */
+function pursueFullMs(level: DefLevel): number {
+  if (level === "dl") return 900;
+  if (level === "lb") return 1200;
+  return 1500;
+}
+
 function freeSpeed(level: DefLevel): number {
-  if (level === "dl") return 0.38;
-  if (level === "lb") return 0.58;
-  return 0.48;
+  // Soft cap below maxStep so integration stays stable
+  return maxStepFree(level) * 0.95;
 }
 
 function grabSpeed(level: DefLevel, double: boolean): number {
-  // Attached bodies ride blocker speed; slight lag for heavier DL
-  if (level === "dl") return double ? 0.72 : 0.58;
-  if (level === "lb") return 0.65;
-  return 0.5;
+  // Attached: still limited — ride blocker, not warp
+  if (level === "dl") return double ? 0.38 : 0.3;
+  if (level === "lb") return 0.34;
+  return 0.28;
 }
 
 function baseAlign(def: LookDefender): Vec {
@@ -266,6 +303,8 @@ type DBody = {
   driveAxis: Vec;
   /** Furthest downfield (smallest y) while grabbed — prevents bounce-back */
   minY: number;
+  /** Cumulative free travel distance (pace budget) */
+  travelFree: number;
 };
 
 export function sampleBlockPhysics(
@@ -304,6 +343,7 @@ export function sampleBlockPhysics(
       grab: null,
       driveAxis: driveDir(def),
       minY: home.y,
+      travelFree: 0,
     };
   });
 
@@ -467,21 +507,54 @@ export function sampleBlockPhysics(
         }
       }
 
-      // ===== FREE: ball tracking by position =====
-      const force = ballTrackForce(body, ball.pos, ball.vel, flowX, gT);
+      // ===== FREE: paced lines + play-read, then limited ball key =====
+      const before = { x: body.pos.x, y: body.pos.y };
+      const force = freePaceForce(
+        body,
+        ball.pos,
+        ball.vel,
+        flowX,
+        gT,
+        tMs,
+        assigned,
+      );
       const accel = scale(force, 1 / body.mass);
-      body.vel = add(scale(body.vel, 0.8), accel);
+      body.vel = add(scale(body.vel, 0.78), accel);
       body.vel = clampMag(body.vel, freeSpeed(body.level));
-      body.pos = clampField(add(body.pos, body.vel));
+      let next = add(body.pos, body.vel);
 
-      // Soft home leash so free players don't sprint off the map
-      const leash =
-        body.level === "dl" ? 12 : body.level === "lb" ? 16 : 18;
-      const homeDelta = sub(body.pos, body.home);
-      if (len(homeDelta) > leash) {
-        body.pos = clampField(add(body.home, scale(norm(homeDelta), leash)));
-        body.vel = scale(body.vel, 0.4);
+      // Hard per-step distance cap ("max distance per click")
+      const stepCap = maxStepFree(body.level);
+      const stepDelta = sub(next, before);
+      const stepLen = len(stepDelta);
+      if (stepLen > stepCap && stepLen > 1e-6) {
+        next = add(before, scale(stepDelta, stepCap / stepLen));
+        body.vel = scale(norm(stepDelta), stepCap);
       }
+
+      // Cumulative free-travel budget
+      const used = len(sub(next, before));
+      const budget = maxTravelFree(body.level) - body.travelFree;
+      if (used > budget && budget >= 0) {
+        if (budget < 1e-4) {
+          next = { ...before };
+          body.vel = v(0, 0);
+        } else {
+          next = add(before, scale(norm(sub(next, before)), budget));
+          body.vel = scale(norm(sub(next, before)), budget);
+        }
+      }
+      body.travelFree += len(sub(next, before));
+
+      // Alignment leash (role depth)
+      const leash = maxFromHomeFree(body.level);
+      const homeDelta = sub(next, body.home);
+      if (len(homeDelta) > leash) {
+        next = add(body.home, scale(norm(homeDelta), leash));
+        body.vel = scale(body.vel, 0.35);
+      }
+
+      body.pos = clampField(next);
     }
 
     // Light D↔D separation only (not grab driver)
@@ -554,64 +627,96 @@ export function sampleBlockPhysics(
 }
 
 /**
- * Free-player pursuit keys on the live ball.
- * Role-specific angles so the whole defense "tracks" the football.
+ * Free-player pace forces.
+ * - Play-read window: keys only (no full pursuit)
+ * - Assigned & unblocked: hold gap / await contact (not chase ball)
+ * - After read: limited track on a slow fit line toward the ball
  */
-function ballTrackForce(
+function freePaceForce(
   body: DBody,
   ball: Vec,
   ballVel: Vec,
   flowX: number,
   gT: number,
+  tMs: number,
+  assigned: { id: string; pos: Vec; vel: Vec }[],
 ): Vec {
+  const r0 = readMs(body.level);
+  const r1 = pursueFullMs(body.level);
+  // 0 during pure read → 1 when full pursue allowed
+  const pursue = smoothstep(r0, r1, tMs);
+
+  // --- Assigned but not yet grabbed: stay on contact path, don't chase ball ---
+  if (assigned.length > 0) {
+    const nearest = assigned
+      .slice()
+      .sort((a, b) => len(sub(a.pos, body.pos)) - len(sub(b.pos, body.pos)))[0]!;
+    const toOl = sub(nearest.pos, body.pos);
+    const d = len(toOl);
+    // Slow get-off along drive axis + inch toward assigned OL
+    const getOff = scale(body.driveAxis, body.level === "dl" ? 0.035 : 0.02);
+    const meet = d > 0.5 ? scale(toOl, 0.04) : v(0, 0);
+    // Tiny flow peek after half-read
+    const peek = scale(v(flowX - body.pos.x, 0), 0.01 * pursue);
+    return add(add(getOff, meet), peek);
+  }
+
   const toBall = sub(ball, body.pos);
   const dist = len(toBall);
   const dir = dist > 1e-4 ? scale(toBall, 1 / dist) : v(0, -1);
-  // Lead the ball slightly
-  const lead = add(ball, scale(ballVel, 0.08));
-  const toLead = sub(lead, body.pos);
+  // Pace-line landmark: mix home (gap) with a delayed ball fit point
+  const fitT = pursue * pursue; // ease into fit
+  const lead = add(ball, scale(ballVel, 0.04 * fitT));
 
   if (body.level === "dl") {
-    // Get-off first 15% of play, then key ball with limited lateral
-    const getOff = v(0, -0.06) ;
-    const pursue = scale(toLead, dist > 8 ? 0.04 : 0.07);
-    // Stay somewhat gap-honest: pull toward home x mixed with ball x
-    const gapX = body.home.x * 0.55 + ball.x * 0.45;
-    const gapPull = v((gapX - body.pos.x) * 0.035, 0);
-    const early = Math.max(0, 1 - gT * 4);
-    return add(add(scale(getOff, 0.6 + early), pursue), gapPull);
+    // Read: vertical get-off only. Later: short gap slide toward ball side.
+    const getOff = v(0, -0.04);
+    const gapX = body.home.x * (1 - 0.35 * fitT) + lead.x * (0.35 * fitT);
+    const gap = v((gapX - body.pos.x) * 0.03, 0);
+    // Pursuit only after read, and only a few yards
+    const chase =
+      fitT > 0.05 && dist < 14
+        ? scale(dir, 0.025 * fitT)
+        : v(0, 0);
+    return add(add(getOff, gap), chase);
   }
 
   if (body.level === "lb") {
-    // Scrape to flow, fit downhill to ball — never teleport
-    const scrape = v((flowX * 0.35 + ball.x * 0.65 - body.pos.x) * 0.07, 0);
-    const downhill = v(0, (Math.min(ball.y + 2, body.home.y + 2) - body.pos.y) * 0.04);
-    const close =
-      dist < 14
-        ? scale(dir, 0.09)
-        : scale(dir, 0.04);
-    // Keep some depth discipline until ball threatens
-    const depthHold =
-      dist > 12
-        ? v(0, (body.home.y - 1.2 - body.pos.y) * 0.03)
+    // Read: hold depth, eyes on mesh — small shuffle only
+    const hold = v(
+      (body.home.x - body.pos.x) * 0.04,
+      (body.home.y - 0.4 - body.pos.y) * 0.035,
+    );
+    // Scrape to flow first, ball second (coaching order)
+    const scrapeTarget = body.home.x * (1 - 0.5 * fitT) + flowX * 0.25 * fitT + lead.x * 0.25 * fitT;
+    const scrape = v((scrapeTarget - body.pos.x) * (0.03 + 0.04 * fitT), 0);
+    // Downhill only after read and only if ball is past LOS threat
+    const ballThreat = ball.y < body.home.y + 6 || fitT > 0.4;
+    const downhill =
+      ballThreat && fitT > 0.15
+        ? v(0, (Math.min(lead.y + 3, body.home.y + 1.5) - body.pos.y) * 0.03 * fitT)
         : v(0, 0);
-    return add(add(add(scrape, downhill), close), depthHold);
+    const close =
+      fitT > 0.35 && dist < 12 ? scale(dir, 0.03 * fitT) : v(0, 0);
+    return add(add(add(hold, scrape), downhill), close);
   }
 
-  // DB: maintain relative depth, angle to ball, contain
-  const depthTarget = body.home.y - Math.min(4, gT * 3);
-  const depth = v(0, (depthTarget - body.pos.y) * 0.05);
-  // Mirror ball laterally with leverage (outside shade)
+  // DB: patience — depth first, angle late
+  const depthTarget = body.home.y - 0.5 * fitT;
+  const depth = v(0, (depthTarget - body.pos.y) * 0.04);
   const leverage = body.home.x < 50 ? -1 : 1;
-  const mirrorX = ball.x + leverage * 3.5;
-  const lat = v((mirrorX - body.pos.x) * 0.04, 0);
-  const angle = scale(toBall, dist > 20 ? 0.02 : 0.045);
-  // Don't crash the box from FS depth
-  const boxLimit =
-    body.home.y < 40 && body.pos.y > 44
-      ? v(0, (42 - body.pos.y) * 0.06)
+  // Mirror slowly; stay near home x during read
+  const mirrorX =
+    body.home.x * (1 - 0.4 * fitT) + (lead.x + leverage * 4) * (0.4 * fitT);
+  const lat = v((mirrorX - body.pos.x) * (0.02 + 0.03 * fitT), 0);
+  const angle =
+    fitT > 0.25 && dist < 28 ? scale(toBall, 0.015 * fitT) : v(0, 0);
+  // Never crash the box early
+  const noCrash =
+    body.home.y < 42 && body.pos.y > body.home.y + 3
+      ? v(0, (body.home.y + 1 - body.pos.y) * 0.05)
       : v(0, 0);
-  return add(add(add(depth, lat), angle), boxLimit);
+  return add(add(add(depth, lat), angle), noCrash);
 }
 
 export function physicsCacheKey(
