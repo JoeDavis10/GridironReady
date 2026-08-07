@@ -17,13 +17,17 @@ import {
   pointAlongPath,
   roleProgressAtPhaseEnd,
   roleProgressAtPhaseStart,
+  type FieldPoint,
   type LookDefender,
   type Play,
   type PlayRole,
 } from "@/data/plays";
 import {
   DEF_FRONTS,
+  LB_Y,
+  LOS_Y,
   buildSimPlay,
+  getAssignmentReport,
   type DefFrontId,
 } from "@/data/play-looks";
 import { sampleBlockPhysics } from "@/lib/block-physics";
@@ -263,6 +267,9 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
   const [showImmersiveOpts, setShowImmersiveOpts] = useState(false);
   /** Player bubble size multiplier (0.6–2). Affects OL + D markers for clarity. */
   const [bubbleScale, setBubbleScale] = useState(1);
+  const [customPos, setCustomPos] = useState<Record<string, FieldPoint>>({});
+  const [dragId, setDragId] = useState<string | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
 
   const rafRef = useRef<number | null>(null);
@@ -272,12 +279,20 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
   const playingRef = useRef(false);
   const speedRef = useRef(1);
 
+  const posOverrides = frontId === "custom" ? customPos : undefined;
   const simPlay = useMemo(
     () =>
       play.side === "offense"
-        ? buildSimPlay(play, frontId, olMode)
+        ? buildSimPlay(play, frontId, olMode, posOverrides)
         : play,
-    [play, frontId, olMode],
+    [play, frontId, olMode, posOverrides],
+  );
+  const assignReport = useMemo(
+    () =>
+      play.side === "offense"
+        ? getAssignmentReport(play.id, frontId, posOverrides)
+        : null,
+    [play.id, play.side, frontId, posOverrides],
   );
   const phase = simPlay.phases[phaseIndex] ?? simPlay.phases[0]!;
   const speed = SPEEDS[speedIdx]!;
@@ -317,7 +332,8 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
     setShowPhasePanel(false);
     setShowImmersiveOpts(false);
     setOlMode("assignment");
-    // keep frontId across plays so coach can compare same front
+    setCustomPos({});
+    setDragId(null);
     phaseRef.current = 0;
     progressRef.current = 0;
     playingRef.current = false;
@@ -325,7 +341,6 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
   }, [play.id]);
 
   useEffect(() => {
-    // Front / OL mode change: restart so assignment paths read cleanly
     setPhaseIndex(0);
     setProgress(0);
     setPlaying(false);
@@ -334,6 +349,18 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
     playingRef.current = false;
     lastTs.current = null;
   }, [frontId, olMode]);
+
+  useEffect(() => {
+    if (frontId !== "custom") return;
+    if (Object.keys(customPos).length > 0) return;
+    const look = buildSimPlay(play, "43-over", "generic").look ?? [];
+    const seed: Record<string, FieldPoint> = {};
+    for (const d of look) {
+      const pt = d.path[0];
+      if (pt) seed[d.id] = [pt[0], pt[1]];
+    }
+    setCustomPos(seed);
+  }, [frontId, play, customPos]);
 
   useEffect(() => {
     if (immersive) {
@@ -554,6 +581,52 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
   const S = (immersive ? 1.2 : 1.08) * bubbleScale;
   const pathW = (base: number) => base * S;
   const fontS = (base: number) => base * S;
+  const customMode = frontId === "custom" && hasLook;
+
+  const clientToField = useCallback(
+    (clientX: number, clientY: number): FieldPoint | null => {
+      const svg = svgRef.current;
+      if (!svg) return null;
+      const pt = svg.createSVGPoint();
+      pt.x = clientX;
+      pt.y = clientY;
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return null;
+      const loc = pt.matrixTransform(ctm.inverse());
+      return [
+        Math.min(94, Math.max(6, loc.x)),
+        Math.min(94, Math.max(6, loc.y)),
+      ];
+    },
+    [],
+  );
+
+  const onDefPointerDown = useCallback(
+    (id: string, e: React.PointerEvent) => {
+      if (!customMode) return;
+      e.preventDefault();
+      e.stopPropagation();
+      (e.target as Element).setPointerCapture?.(e.pointerId);
+      setDragId(id);
+      setPlaying(false);
+      playingRef.current = false;
+    },
+    [customMode],
+  );
+
+  const onDefPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!dragId || !customMode) return;
+      const fp = clientToField(e.clientX, e.clientY);
+      if (!fp) return;
+      setCustomPos((prev) => ({ ...prev, [dragId]: fp }));
+    },
+    [dragId, customMode, clientToField],
+  );
+
+  const onDefPointerUp = useCallback(() => {
+    setDragId(null);
+  }, []);
 
   return (
     <div
@@ -661,23 +734,22 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
           )}
         >
         <svg
+          ref={svgRef}
           viewBox="0 0 100 100"
           width="100%"
           height="100%"
           preserveAspectRatio="xMidYMid meet"
           className={cn(
-            "w-full max-w-full",
-            // Fill every free pixel in immersive; non-immersive keeps readable aspect
-            immersive
-              ? "h-full min-h-0 w-full max-h-full"
-              : "aspect-[5/6]",
+            "w-full max-w-full touch-none",
+            immersive ? "h-full min-h-0 w-full max-h-full" : "aspect-[5/6]",
+            customMode && "cursor-crosshair",
           )}
-          style={{
-            shapeRendering: "geometricPrecision",
-            textRendering: "geometricPrecision",
-          }}
+          style={{ shapeRendering: "geometricPrecision", textRendering: "geometricPrecision" }}
           role="img"
           aria-label={`${simPlay.name} play diagram · ${simPlay.lookFront ?? ""}`}
+          onPointerMove={onDefPointerMove}
+          onPointerUp={onDefPointerUp}
+          onPointerLeave={onDefPointerUp}
         >
           <defs>
             {ROLE_HUES.map((hue, i) => (
@@ -713,37 +785,52 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
             stroke="var(--color-border-strong)"
             strokeWidth={0.45 * S}
           />
-          {[15, 25, 35, 45, 50, 55, 65, 75, 85].map((y) => (
+          {[20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80].map((y) => (
             <line
-              key={y}
+              key={`yl-${y}`}
               x1="5"
               x2="95"
               y1={y}
               y2={y}
               stroke="var(--color-border)"
-              strokeWidth={y === 50 ? 0.7 * S : 0.28 * S}
-              strokeDasharray={y === 50 ? undefined : "1.1 1.3"}
-              opacity={y === 50 ? 0.95 : 0.4}
+              strokeWidth={y === LOS_Y ? 0.75 * S : y % 10 === 0 ? 0.35 * S : 0.22 * S}
+              strokeDasharray={y === LOS_Y ? undefined : y % 10 === 0 ? undefined : "0.8 1.2"}
+              opacity={y === LOS_Y ? 0.95 : y % 10 === 0 ? 0.55 : 0.28}
             />
           ))}
-          {[25, 40, 60, 75].map((y) => (
-            <g key={`h-${y}`} opacity={0.45}>
-              <line x1="28" x2="33" y1={y} y2={y} stroke="var(--color-fg)" strokeWidth={0.35 * S} />
-              <line x1="67" x2="72" y1={y} y2={y} stroke="var(--color-fg)" strokeWidth={0.35 * S} />
+          {[20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80].map((y) => (
+            <g key={`hash-${y}`} opacity={y === LOS_Y ? 0.85 : 0.5}>
+              <line x1="34" x2="36.5" y1={y} y2={y} stroke="var(--color-fg)" strokeWidth={0.4 * S} />
+              <line x1="63.5" x2="66" y1={y} y2={y} stroke="var(--color-fg)" strokeWidth={0.4 * S} />
             </g>
           ))}
-          <text
-            x="50"
-            y="51.9"
-            textAnchor="middle"
-            fill="var(--color-subtle)"
-            fontSize={fontS(2.4)}
-            fontFamily="var(--font-body)"
-            fontWeight="600"
-            opacity={0.75}
-          >
+          {[20, 30, 40, 50, 60, 70, 80].map((y) => (
+            <g key={`side-${y}`} opacity={0.35}>
+              <line x1="5" x2="7.5" y1={y} y2={y} stroke="var(--color-fg)" strokeWidth={0.35 * S} />
+              <line x1="92.5" x2="95" y1={y} y2={y} stroke="var(--color-fg)" strokeWidth={0.35 * S} />
+            </g>
+          ))}
+          <line
+            x1="8"
+            x2="92"
+            y1={LB_Y}
+            y2={LB_Y}
+            stroke="var(--color-info)"
+            strokeWidth={0.25 * S}
+            strokeDasharray="1.2 1.4"
+            opacity={0.45}
+          />
+          <text x="8.5" y={LB_Y - 0.8} fill="var(--color-info)" fontSize={fontS(1.5)} fontFamily="var(--font-body)" opacity={0.7}>
+            LB 4yd
+          </text>
+          <text x="50" y="51.9" textAnchor="middle" fill="var(--color-subtle)" fontSize={fontS(2.4)} fontFamily="var(--font-body)" fontWeight="600" opacity={0.75}>
             LOS
           </text>
+          {customMode && (
+            <text x="50" y="8" textAnchor="middle" fill="var(--color-primary)" fontSize={fontS(2.1)} fontWeight="700" fontFamily="var(--font-display)">
+              CUSTOM — drag D to re-assign
+            </text>
+          )}
 
           {/* Paths — pullers solid+arrow, others light dashed */}
           {roleStates.map(({ role, i, trail, pull }) => {
@@ -858,18 +945,21 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                 key={def.id}
                 transform={`translate(${pos[0]}, ${pos[1]})`}
                 opacity={dimmed ? 0.22 : 0.95}
-                className="cursor-pointer"
+                className={cn("cursor-pointer", customMode && "cursor-grab active:cursor-grabbing")}
+                onPointerDown={(e) => onDefPointerDown(def.id, e)}
                 onClick={() => {
+                  if (customMode) return;
                   setFocusRoleId(null);
                   setFocusLookId((cur) => (cur === def.id ? null : def.id));
                 }}
               >
+                {customMode && (
+                  <circle r={s + 1.2} fill="none" stroke="var(--color-primary)" strokeWidth={0.3 * S} strokeDasharray="0.6 0.5" opacity={dragId === def.id ? 0.9 : 0.35} />
+                )}
                 <polygon
                   points={`0,${-s} ${s},0 0,${s} ${-s},0`}
                   fill={DEF_FILL}
-                  stroke={
-                    def.doubleTeam || pressure > 0.45 ? DOUBLE : DEF_STROKE
-                  }
+                  stroke={def.doubleTeam || pressure > 0.45 || customMode ? DOUBLE : DEF_STROKE}
                   strokeWidth={0.45 * S}
                 />
                 <text
@@ -1026,6 +1116,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                   key={f.id}
                   type="button"
                   onClick={() => {
+                    if (f.id === "custom") setCustomPos({});
                     setFrontId(f.id);
                     setFocusLookId(null);
                     goToPhase(0);
@@ -1086,6 +1177,7 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
                 key={f.id}
                 type="button"
                 onClick={() => {
+                  if (f.id === "custom") setCustomPos({});
                   setFrontId(f.id);
                   goToPhase(0);
                 }}
@@ -1104,12 +1196,60 @@ export function PlayDiagramAnimator({ play }: { play: Play }) {
       )}
 
       {hasLook && simPlay.lookNote && showLook && !immersive && (
-        <p className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs leading-relaxed text-[var(--color-muted)]">
-          <span className="font-semibold text-[var(--color-fg)]">
-            {olMode === "assignment" ? "GOD assignment · " : "Reactive D · "}
-          </span>
-          {simPlay.lookNote}
-        </p>
+        <div className="space-y-2">
+          <p className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs leading-relaxed text-[var(--color-muted)]">
+            <span className="font-semibold text-[var(--color-fg)]">
+              {assignReport?.schemeUsesGod ? "GOD ON · " : "GOD limited · "}
+            </span>
+            {simPlay.lookNote}
+          </p>
+          {customMode && (
+            <p className="rounded-[var(--radius-lg)] border border-[color-mix(in_oklab,var(--color-primary)_40%,var(--color-border))] bg-[color-mix(in_oklab,var(--color-primary-dim)_35%,var(--color-surface))] px-3 py-2 text-xs leading-relaxed text-[var(--color-fg)]">
+              <span className="font-semibold text-[var(--color-primary)]">Custom front: </span>
+              Drag any diamond. Gaps and every OL assignment recompute live.
+              <button type="button" className="ml-2 font-semibold underline" onClick={() => setCustomPos({})}>
+                Reset alignment
+              </button>
+            </p>
+          )}
+          {assignReport && olMode === "assignment" && (
+            <div className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--color-subtle)]">
+                Player assignments · {assignReport.frontLabel}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--color-muted)]">{assignReport.schemeNote}</p>
+              {assignReport.gaps.length > 0 && (
+                <p className="mt-2 text-[11px] text-[var(--color-subtle)]">
+                  Gaps: {assignReport.gaps.slice(0, 5).map((g) => g.label).join(" · ")}
+                </p>
+              )}
+              <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto overscroll-contain">
+                {(["lt", "lg", "c", "rg", "rt", "y", "fb"] as const).map((id) => {
+                  const r = assignReport.roles.find((x) => x.roleId === id);
+                  if (!r) return null;
+                  return (
+                    <li key={id} className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-elevated)] px-2.5 py-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-display text-sm font-semibold uppercase text-[var(--color-fg)]">{r.roleId}</span>
+                        <Badge variant={r.usesGod ? "default" : "outline"} className="text-[10px]">
+                          {r.usesGod ? "GOD" : "not GOD"}
+                        </Badge>
+                        <span className="text-[10px] uppercase tracking-wide text-[var(--color-subtle)]">{r.rule}</span>
+                        {r.targetTags.length > 0 && (
+                          <span className="text-[11px] text-[var(--color-primary)]">→ {r.targetTags.join("+")}</span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--color-muted)]">{r.why}</p>
+                      {r.whyNotGod && (
+                        <p className="mt-1 text-[11px] leading-relaxed text-[var(--color-subtle)]">Why not GOD: {r.whyNotGod}</p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
       )}
 
       <div
