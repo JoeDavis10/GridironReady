@@ -54,9 +54,11 @@ function schemeCapable(playId: string): boolean {
     "dive",
     "iso",
     "inside-zone",
+    "split-zone",
     "power",
     "reach",
     "outside-zone",
+    "pin-pull",
     "counter-simple",
     "counter",
   ].includes(playId);

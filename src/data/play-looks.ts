@@ -102,16 +102,18 @@ export type SchemeId =
   | "dive"
   | "iso"
   | "inside-zone"
+  | "split-zone"
   | "power"
   | "reach"
   | "outside-zone"
+  | "pin-pull"
   | "counter-simple"
   | "counter";
 
 /** Per-OL (and skill) assignment for teaching */
 export interface RoleAssignment {
   roleId: string;
-  rule: "god-base" | "god-down" | "god-combo" | "zone" | "pull" | "hinge" | "reach" | "lead" | "stalk" | "cutoff" | "none";
+  rule: "god-base" | "god-down" | "god-combo" | "zone" | "pull" | "hinge" | "reach" | "lead" | "stalk" | "cutoff" | "pin" | "none";
   usesGod: boolean;
   why: string;
   whyNotGod?: string;
@@ -158,9 +160,11 @@ export function schemeOf(playId: string): SchemeId | null {
     "dive",
     "iso",
     "inside-zone",
+    "split-zone",
     "power",
     "reach",
     "outside-zone",
+    "pin-pull",
     "counter-simple",
     "counter",
   ];
@@ -190,13 +194,17 @@ export function schemeGodExplanation(scheme: SchemeId): string {
     case "iso":
       return "GOD for the base wall + uncovered combo rules. Covered OL bases On; uncovered doubles the down man and climbs. FB is NOT GOD — pure iso lead on the LB.";
     case "inside-zone":
-      return "GOD does NOT fully apply. This is zone: block the area (slide to gap, drive as one, peel on flow). Same landmarks, different rule set — area not jersey.";
+      return "GOD does NOT apply. Covered/Uncovered IZ: COVERED = base/combo the man on you; UNCOVERED = help the down defender, then climb on flow. Area track first, jersey second.";
+    case "split-zone":
+      return "GOD does NOT apply. Split zone = IZ track for the line ONE way + H/FB kick-out the opposite edge. Line zones; H is the split block — not GOD.";
     case "power":
       return "GOD on the down wall (playside bases/downs). Puller is the exception — he leaves his gap to kick/wrap. Backside hinge is gap responsibility, not a classic base.";
     case "reach":
       return "GOD does NOT apply the same way. Outside/toss is reach/seal the EMOL — gain width, keep him inside. Not gap-on-down base rules.";
     case "outside-zone":
       return "GOD does NOT apply. Full-line zone stretch: everyone reaches playside; climb/cutback is flow-based, not man-on GOD.";
+    case "pin-pull":
+      return "GOD does NOT apply the same way. Pin & Pull: playside PINS (seal inside), backside PULLS lead through the alley. Hybrid zone/gap edge scheme — not pure GOD base.";
     case "counter-simple":
       return "GOD on the down wall (counter side). Guard pull is the exception to GOD (leaves gap). RT hinges — stays home. Same as power, one puller only.";
     case "counter":
@@ -1806,67 +1814,263 @@ export function evaluateAssignments(
         ra.path = pathReach([OL_X[ol] ?? OL_X.rt!, OL_Y], [alignX(emol), alignY(emol)], dir);
       }
     }
-  } else if (scheme === "inside-zone" || scheme === "outside-zone") {
-    // Zone — not GOD
+  } else if (
+    scheme === "inside-zone" ||
+    scheme === "outside-zone" ||
+    scheme === "split-zone"
+  ) {
+    // Zone family — not GOD (covered/uncovered IZ, OZ stretch, split zone)
     const dir = ps === "R" ? 1 : -1;
+    const isOz = scheme === "outside-zone";
+    const isSplit = scheme === "split-zone";
     for (const ol of OL_ORDER) {
       const dl = olToDl.get(ol);
       const ra = ensureRole(ol);
       ra.rule = "zone";
       ra.usesGod = false;
-      ra.whyNotGod =
-        scheme === "inside-zone"
-          ? "Inside zone is area blocking: slide to the gap, drive as one, peel on flow — not man-on GOD."
-          : "Outside zone is full-line reach stretch with cutback — flow rules, not GOD jersey rules.";
+      ra.whyNotGod = isOz
+        ? "Outside zone is full-line reach stretch with cutback — flow rules, not GOD jersey rules."
+        : isSplit
+          ? "Split zone: OL zones playside like IZ; the H/FB kick opposite is the 'split' — not GOD."
+          : "Covered/Uncovered IZ is area first: covered = man on you; uncovered = help down + climb. Not GOD.";
       if (dl) {
         const others = dlToOl.get(dl.id) ?? [ol];
-        if (others.length >= 2 || !dl) {
+        if (others.length >= 2) {
           setDefEng(
             dl,
             others.slice(0, 2),
-            `Zone combo on ${dl.tag} — slide/drive, peel LB.`,
+            isOz
+              ? `OZ combo reach ${dl.tag} — stay on track.`
+              : `COVERED combo on ${dl.tag} — slide/drive, peel LB on flow.`,
             true,
           );
           ra.rule = "zone";
           ra.targetIds = [dl.id];
           ra.targetTags = [dl.tag];
-          ra.why = `Zone combo landmark ${dl.tag}. Stay on track; climb when he is reached.`;
-          ra.job = `Zone combo ${dl.tag}`;
-          ra.path =
-            scheme === "outside-zone"
-              ? pathReach([OL_X[ol]!, OL_Y], [alignX(dl), alignY(dl)], dir)
-              : pathCombo(
-                  [OL_X[ol]!, OL_Y],
-                  [alignX(dl), alignY(dl)],
-                  nearestLb(lbs, OL_X[ol]!),
-                );
+          ra.why = isOz
+            ? `OZ combo landmark ${dl.tag}. Reach together; climb when secured.`
+            : `COVERED (shared surface): combo ${dl.tag} with partner. Hold the double the extra beat; climb on flow.`;
+          ra.job = isOz ? `OZ combo ${dl.tag}` : `Covered combo ${dl.tag}`;
+          ra.path = isOz
+            ? pathReach([OL_X[ol]!, OL_Y], [alignX(dl), alignY(dl)], dir)
+            : pathCombo(
+                [OL_X[ol]!, OL_Y],
+                [alignX(dl), alignY(dl)],
+                nearestLb(lbs, OL_X[ol]!),
+              );
         } else {
-          setDefEng(dl, [ol], `Zone base/reach ${dl.tag}.`, false);
+          setDefEng(
+            dl,
+            [ol],
+            isOz ? `OZ reach ${dl.tag}.` : `COVERED base ${dl.tag}.`,
+            false,
+          );
           ra.targetIds = [dl.id];
           ra.targetTags = [dl.tag];
-          ra.why = `Covered in zone — track ${dl.tag}, vertical or reach per call.`;
-          ra.job = `Zone ${dl.tag}`;
-          ra.path =
-            scheme === "outside-zone"
-              ? pathReach([OL_X[ol]!, OL_Y], [alignX(dl), alignY(dl)], dir)
-              : pathBase([OL_X[ol]!, OL_Y], [alignX(dl), alignY(dl)]);
+          ra.why = isOz
+            ? `Covered OZ — reach ${dl.tag}, stay on the stretch track.`
+            : `COVERED: man on you is ${dl.tag}. Base/zone him — do not freestyle.`;
+          ra.job = isOz ? `OZ ${dl.tag}` : `Covered ${dl.tag}`;
+          ra.path = isOz
+            ? pathReach([OL_X[ol]!, OL_Y], [alignX(dl), alignY(dl)], dir)
+            : pathBase([OL_X[ol]!, OL_Y], [alignX(dl), alignY(dl)]);
         }
       } else {
         const down = findDownDefender(ol, dls, ps);
         if (down) {
           ra.targetIds = [down.id];
           ra.targetTags = [down.tag];
-          ra.why = `Uncovered zone — work to ${down.tag} combo then climb.`;
-          ra.job = `Zone help ${down.tag}`;
+          ra.why = isOz
+            ? `Uncovered OZ — work to ${down.tag} then climb on stretch.`
+            : `UNCOVERED: no man on you. Help the down defender (${down.tag}), combo, then climb LB on flow.`;
+          ra.job = isOz ? `OZ help ${down.tag}` : `Uncovered → ${down.tag}`;
           ra.path = pathCombo(
             [OL_X[ol]!, OL_Y],
             [alignX(down), alignY(down)],
             nearestLb(lbs, OL_X[ol]!),
           );
           const list = [...new Set([...down.engagedBy, ol])];
-          setDefEng(down, list, `Zone combo help on ${down.tag}.`, list.length >= 2);
+          setDefEng(
+            down,
+            list,
+            isOz
+              ? `OZ combo help on ${down.tag}.`
+              : `Uncovered help combo on ${down.tag}.`,
+            list.length >= 2,
+          );
+        } else {
+          ra.why = "UNCOVERED with no down surface — climb first LB on flow.";
+          ra.job = "Uncovered climb";
+          ra.path = pathClimb([OL_X[ol]!, OL_Y], nearestLb(lbs, OL_X[ol]!));
         }
       }
+    }
+
+    // Split zone: H/FB kicks the OPPOSITE edge (not the zone track)
+    if (isSplit) {
+      const opp = ps === "R" ? "L" : "R";
+      const edge =
+        opp === "L"
+          ? dls[0] ?? null
+          : dls[dls.length - 1] ?? null;
+      // Prefer DE on the backside of the zone call
+      const kickTarget =
+        edge ??
+        [...dls].sort(
+          (a, b) =>
+            (opp === "L" ? alignX(a) - alignX(b) : alignX(b) - alignX(a)),
+        )[0] ??
+        null;
+      const hRole = ensureRole("h");
+      const fbRole = ensureRole("fb");
+      for (const ra of [hRole, fbRole]) {
+        ra.rule = "lead";
+        ra.usesGod = false;
+        ra.whyNotGod =
+          "Split block is a kick/wrap opposite the zone track — not an OL GOD rule.";
+        if (kickTarget) {
+          setDefEng(
+            kickTarget,
+            ["h", "fb"].filter((id) => roleMap.has(id) || id === "h"),
+            `Split kick: H/FB on ${kickTarget.tag} (opposite zone).`,
+            false,
+          );
+          // Prefer single engagers
+          kickTarget.engagedBy = ["h"];
+          ra.targetIds = [kickTarget.id];
+          ra.targetTags = [kickTarget.tag];
+          ra.why = `SPLIT: zone is ${ps === "R" ? "right" : "left"}; you kick ${kickTarget.tag} the OTHER way. Open path, square pads, don't glance.`;
+          ra.job = `Split kick ${kickTarget.tag}`;
+          ra.path = pathClimb(
+            [OL_X.h ?? 47, 58],
+            [alignX(kickTarget), alignY(kickTarget)],
+          );
+        } else {
+          ra.why = "Split kick — first color on the backside edge.";
+          ra.job = "Split kick edge";
+          ra.path = pathClimb(
+            [OL_X.h ?? 47, 58],
+            [ps === "R" ? 40 : 60, LB_Y],
+          );
+        }
+      }
+      // Only H is primary kick; FB lead through if present in play
+      fbRole.rule = "lead";
+      fbRole.why =
+        "After H kicks, you are the second color / wrap — or idle if no FB in the call.";
+      fbRole.job = "Split wrap / second";
+      if (kickTarget) {
+        fbRole.path = pathClimb(
+          [50, 58],
+          [alignX(kickTarget) + (ps === "R" ? -2 : 2), alignY(kickTarget) - 2],
+        );
+      }
+    }
+  } else if (scheme === "pin-pull") {
+    // Pin & Pull: playside pins, backside pulls (hybrid — not pure GOD)
+    const dir = ps === "R" ? 1 : -1;
+    const psOl = ps === "R" ? (["c", "rg", "rt", "y"] as const) : (["c", "lg", "lt", "y"] as const);
+    const bsPull = ps === "R" ? (["lg", "lt"] as const) : (["rg", "rt"] as const);
+
+    // Playside: PIN (seal inside / down)
+    for (const ol of psOl) {
+      if (ol === "y" && !OL_X.y) continue;
+      const ra = ensureRole(ol);
+      ra.rule = "pin";
+      ra.usesGod = false;
+      ra.whyNotGod =
+        "Pin & Pull uses pin seals on the call side — not classic GOD base/on.";
+      const dl =
+        olToDl.get(ol) ??
+        findDownDefender(ol === "y" ? "rt" : ol, dls, ps);
+      if (dl) {
+        setDefEng(dl, [ol], `Pin seal ${dl.tag} — keep him inside.`, false);
+        ra.targetIds = [dl.id];
+        ra.targetTags = [dl.tag];
+        ra.why = `PIN: seal ${dl.tag} inside. Gain width, don't let him cross your face outside.`;
+        ra.job = `Pin ${dl.tag}`;
+        ra.path = pathReach(
+          [OL_X[ol] ?? OL_X.rt!, OL_Y],
+          [alignX(dl), alignY(dl)],
+          dir,
+        );
+      } else {
+        ra.why = "PIN: no down man — hinge/set the edge.";
+        ra.job = "Pin edge";
+        ra.path = pathHinge([OL_X[ol] ?? OL_X.rt!, OL_Y], [
+          (OL_X[ol] ?? 57) + dir * 2,
+          DL_Y,
+        ]);
+      }
+    }
+
+    // Backside: first puller (G) kicks/leads, second (T) wraps
+    const kickLb = nearestLbDef(lbs, ps === "R" ? 58 : 42);
+    const wrapLb =
+      lbs
+        .filter((l) => l.id !== kickLb?.id)
+        .sort(
+          (a, b) =>
+            Math.abs(alignX(a) - (ps === "R" ? 54 : 46)) -
+            Math.abs(alignX(b) - (ps === "R" ? 54 : 46)),
+        )[0] ?? null;
+
+    const gId = bsPull[0]!;
+    const tId = bsPull[1]!;
+    const gRa = ensureRole(gId);
+    gRa.rule = "pull";
+    gRa.usesGod = false;
+    gRa.whyNotGod = "Puller leaves his gap — pin & pull exception to stay-home rules.";
+    if (kickLb) {
+      setDefEng(kickLb, [gId], `Pin-pull kick ${kickLb.tag}.`, false);
+      gRa.targetIds = [kickLb.id];
+      gRa.targetTags = [kickLb.tag];
+      gRa.why = `PULL #1: flat path, kick/wrap ${kickLb.tag} through the alley. Playside is pinning for you.`;
+      gRa.job = `Pull kick ${kickLb.tag}`;
+      gRa.path = pathPull(
+        [OL_X[gId]!, OL_Y],
+        [alignX(kickLb), alignY(kickLb)],
+        ps,
+      );
+    } else {
+      gRa.why = "PULL #1: lead through the alley.";
+      gRa.job = "Pull lead";
+      gRa.path = pathPull([OL_X[gId]!, OL_Y], [ps === "R" ? 58 : 42, LB_Y], ps);
+    }
+
+    const tRa = ensureRole(tId);
+    tRa.rule = "pull";
+    tRa.usesGod = false;
+    tRa.whyNotGod = "Second puller wraps — not a hinge on pin-pull.";
+    if (wrapLb) {
+      setDefEng(wrapLb, [tId], `Pin-pull wrap ${wrapLb.tag}.`, false);
+      tRa.targetIds = [wrapLb.id];
+      tRa.targetTags = [wrapLb.tag];
+      tRa.why = `PULL #2: trail the guard, wrap ${wrapLb.tag}. Don't collide — stack depth.`;
+      tRa.job = `Pull wrap ${wrapLb.tag}`;
+      tRa.path = pathPull(
+        [OL_X[tId]!, OL_Y],
+        [alignX(wrapLb), alignY(wrapLb)],
+        ps,
+      );
+    } else {
+      tRa.why = "PULL #2: wrap first color in the hole.";
+      tRa.job = "Pull wrap";
+      tRa.path = pathPull([OL_X[tId]!, OL_Y], [ps === "R" ? 54 : 46, LB_Y], ps);
+    }
+
+    // Remaining backside interior (C already handled if playside) — if C was only PS, BS C pin is done
+    // FB lead if present
+    const fb = ensureRole("fb");
+    fb.rule = "lead";
+    fb.usesGod = false;
+    fb.whyNotGod = "FB lead is not GOD.";
+    if (kickLb) {
+      fb.targetIds = [kickLb.id];
+      fb.targetTags = [kickLb.tag];
+      fb.why = `Lead with the pullers — first/second color ${kickLb.tag}.`;
+      fb.job = `Lead ${kickLb.tag}`;
+      fb.path = pathClimb([50, 58], [alignX(kickLb), alignY(kickLb)]);
     }
   }
 
@@ -2019,7 +2223,7 @@ function attachDrivePaths(
     let dx = (x0 - ox) * 0.35;
     let dy = -1;
 
-    if (scheme === "reach" || scheme === "outside-zone") {
+    if (scheme === "reach" || scheme === "outside-zone" || scheme === "pin-pull") {
       dx = side * 1.4 + (x0 - ox) * 0.2;
       dy = -0.55;
     } else if (scheme === "power" || scheme === "counter" || scheme === "counter-simple") {
@@ -2031,7 +2235,7 @@ function attachDrivePaths(
         dx = side * 0.35 + (x0 - ox) * 0.15;
         dy = -1.05;
       }
-    } else if (scheme === "inside-zone") {
+    } else if (scheme === "inside-zone" || scheme === "split-zone") {
       dx = side * 0.55 + (x0 - ox) * 0.25;
       dy = -0.9;
     } else if (scheme === "iso" || scheme === "dive") {
@@ -2240,10 +2444,12 @@ function schemeShort(scheme: SchemeId): string {
   const m: Record<SchemeId, string> = {
     dive: "GOD base",
     iso: "GOD + iso",
-    "inside-zone": "zone (not GOD)",
+    "inside-zone": "covered/uncovered IZ",
+    "split-zone": "IZ + H kick opposite",
     power: "GOD wall + pull",
     reach: "reach (not GOD)",
     "outside-zone": "OZ (not GOD)",
+    "pin-pull": "pin PS + pull BS",
     "counter-simple": "GOD wall + G pull",
     counter: "GOD wall + G/T pull",
   };
